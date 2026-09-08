@@ -64,7 +64,7 @@ struct TrainingProfileView: View {
                 Button("Update Next Week (Recommended)") {
                     Task { await model.regenerate(scope: .nextWeek) }
                 }
-                Button("Rebalance This Week") {
+                Button(model.currentWeekActionTitle) {
                     Task { await model.regenerate(scope: .remainingCurrentWeek) }
                 }
                 Button("Cancel", role: .cancel) {

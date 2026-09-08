@@ -3,7 +3,7 @@
 //  Runaway iOS
 //
 //  Training view with streamlined hierarchy:
-//  Action-first → Readiness → Progress → Details
+//  Earned progress → Next Up → Context → Details
 //
 //  Based on UX research for athletic apps:
 //  - Eastern Peak fitness app best practices
@@ -15,138 +15,68 @@ import SwiftUI
 
 struct TrainingView: View {
     @Environment(DataManager.self) var dataManager
-    @Environment(AppRouter.self) private var router
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
+    @State private var selectedActivity: LocalActivity?
     let onSeeAllActivities: () -> Void
 
-    private var greetingPrefix: String {
-        let h = Calendar.current.component(.hour, from: Date())
-        if h < 12 { return "Morning" }
-        if h < 17 { return "Afternoon" }
-        return "Evening"
-    }
-
-    private var firstName: String { dataManager.athlete?.firstname ?? "there" }
-    private var avatarInitial: String {
-        String((dataManager.athlete?.firstname ?? "?").prefix(1)).uppercased()
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening"
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    AppTheme.Colors.DarkMode.backgroundElevated,
-                    AppTheme.Colors.DarkMode.background
-                ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [AppTheme.Colors.warmAmber.opacity(0.07), .clear],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 280
-            )
-            .ignoresSafeArea()
-
-            if dataManager.activities.isEmpty {
-                VStack(spacing: AppTheme.Spacing.lg) {
-                    TrainingPersonalizationPromptCard(store: trainingProfileStore)
-                        .padding(.horizontal, AppTheme.Spacing.lg)
-                        .padding(.top, AppTheme.Spacing.sm)
-                    EmptyInsightsStateView()
-                }
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-
-                        // ── 1. Greeting header ─────────────────────────────
-                        HStack(alignment: .bottom) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(Date(), format: .dateTime.weekday(.wide).month(.abbreviated).day())
-                                    .font(AppTheme.Typography.subheadline)
-                                    .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                                Text("\(greetingPrefix), \(firstName)")
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                            }
-                            Spacer()
-                            ZStack {
-                                Circle()
-                                    .fill(AppTheme.Colors.warmAmber.opacity(0.16))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(Circle().stroke(AppTheme.Colors.Semantic.border, lineWidth: 1))
-                                Text(avatarInitial)
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                    .foregroundColor(AppTheme.Colors.warmAmber)
-                            }
-                        }
-                        .padding(.horizontal, AppTheme.Spacing.lg)
-                        .padding(.top, AppTheme.Spacing.sm)
-
-                        TrainingPersonalizationPromptCard(store: trainingProfileStore)
-
-                        // ── 2. Readiness ring card ─────────────────────────
-                        ReadinessBanner()
-
-                        // ── 3. This Week (hero mileage + goal) ─────────────
-                        WeeklyStatsCard()
-
-                        // ── 4. Next Up (planned workout or ready prompt) ───
-                        TodaysFocusCard()
-
-                        // ── 5. Latest activity ─────────────────────────────
-                        latestSection
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(Date(), format: .dateTime.weekday(.wide).month(.abbreviated).day())
+                            .font(.subheadline).foregroundStyle(TrainingProgressStyle.secondary)
+                        Text("\(greeting), \(dataManager.athlete?.firstname ?? "there")")
+                            .font(.system(.title, design: .rounded, weight: .bold)).foregroundStyle(.white)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .padding(.bottom, 100) // clear FAB
+                    Spacer()
+                    Text(String((dataManager.athlete?.firstname ?? "R").prefix(1)).uppercased())
+                        .font(.system(.headline, design: .rounded)).foregroundStyle(TrainingProgressStyle.amber)
+                        .frame(width: 42, height: 42).background(.white.opacity(0.06), in: Circle())
+                }.padding(.top, 8)
+
+                TrainingProgressCard()
+                TodaysFocusCard()
+                ReadinessBanner(compact: true)
+                TodayWeatherChip()
+                TrainingPersonalizationPromptCard(store: trainingProfileStore)
+
+                if let latest = dataManager.activities.first {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            EyebrowLabel(text: "LATEST WORK")
+                            Spacer()
+                            Button("See all", action: onSeeAllActivities)
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(TrainingProgressStyle.blue)
+                                .frame(minHeight: 44)
+                        }
+                        CardView(activity: toLocal(latest), onTap: { selectedActivity = toLocal(latest) })
+                    }
                 }
             }
-
+            .padding(.horizontal, 18).padding(.bottom, 110)
+        }
+        .background {
+            LinearGradient(colors: [AppTheme.Colors.DarkMode.backgroundElevated, AppTheme.Colors.DarkMode.background], startPoint: .topTrailing, endPoint: .bottomLeading).ignoresSafeArea()
         }
         .navigationBarHidden(true)
-        .refreshable { await dataManager.refreshActivities() }
-    }
-
-    // MARK: - Latest section
-
-    @ViewBuilder
-    private var latestSection: some View {
-        if let latest = dataManager.activities.first {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    EyebrowLabel(text: "LATEST")
-                    Spacer()
-                    Button(action: onSeeAllActivities) {
-                        Text("See all")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(AppTheme.Colors.warmAmber)
-                    }
-                }
-                .padding(.horizontal, 2)
-
-                let previousSlice = Array(dataManager.activities.dropFirst().prefix(10).map { toLocal($0) })
-                CardView(
-                    activity: toLocal(latest),
-                    previousActivities: previousSlice
-                )
-            }
+        .refreshable {
+            await dataManager.refreshActivities()
+            if let id = dataManager.athlete?.id { await TrainingProgressStore.shared.refresh(athleteID: id, force: true) }
         }
+        .sheet(item: $selectedActivity) { activity in NavigationStack { ActivityDetailView(activity: activity) } }
     }
 
-    private func toLocal(_ a: Activity) -> LocalActivity {
-        LocalActivity(
-            id: a.id,
-            name: a.name ?? "Activity",
-            type: a.type ?? "",
-            summary_polyline: a.summary_polyline ?? "",
-            distance: a.distance ?? 0,
-            start_date: (a.start_date).map { Date(timeIntervalSince1970: $0) },
-            elapsed_time: a.elapsed_time ?? 0
-        )
+    private func toLocal(_ activity: Activity) -> LocalActivity {
+        LocalActivity(id: activity.id, name: activity.name ?? "Activity", type: activity.type ?? "Other",
+            summary_polyline: activity.summary_polyline ?? "", distance: activity.distance ?? 0,
+            start_date: (activity.activity_date ?? activity.start_date).map { Date(timeIntervalSince1970: $0) },
+            elapsed_time: activity.elapsed_time ?? 0)
     }
 }
 

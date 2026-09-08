@@ -43,6 +43,15 @@ struct AppleHeartRateZoneSnapshot: Equatable, Sendable {
     }
 }
 
+struct TrainingHourlyWeatherSnapshot: Equatable, Sendable, Identifiable {
+    let date: Date
+    let symbolName: String
+    let temperatureCelsius: Double
+    let precipitationChance: Double
+
+    var id: Date { date }
+}
+
 struct TrainingWeatherSnapshot: Equatable, Sendable {
     let symbolName: String
     let feelsLikeCelsius: Double
@@ -50,6 +59,123 @@ struct TrainingWeatherSnapshot: Equatable, Sendable {
     let windMetersPerSecond: Double
     let precipitationChance: Double
     let uvIndex: Int
+    let currentTemperatureCelsius: Double?
+    let highCelsius: Double?
+    let lowCelsius: Double?
+    let hourlyForecast: [TrainingHourlyWeatherSnapshot]
+
+    init(
+        symbolName: String,
+        feelsLikeCelsius: Double,
+        humidity: Double,
+        windMetersPerSecond: Double,
+        precipitationChance: Double,
+        uvIndex: Int,
+        currentTemperatureCelsius: Double? = nil,
+        highCelsius: Double? = nil,
+        lowCelsius: Double? = nil,
+        hourlyForecast: [TrainingHourlyWeatherSnapshot] = []
+    ) {
+        self.symbolName = symbolName
+        self.feelsLikeCelsius = feelsLikeCelsius
+        self.humidity = humidity
+        self.windMetersPerSecond = windMetersPerSecond
+        self.precipitationChance = precipitationChance
+        self.uvIndex = uvIndex
+        self.currentTemperatureCelsius = currentTemperatureCelsius
+        self.highCelsius = highCelsius
+        self.lowCelsius = lowCelsius
+        self.hourlyForecast = hourlyForecast
+    }
+}
+
+struct RunCastGearRecommendation: Equatable, Sendable, Identifiable {
+    let title: String
+    let detail: String
+    let symbolName: String
+
+    var id: String { title }
+}
+
+enum RunCastPrecipitationPolicy {
+    static let likelyThreshold = 0.40
+
+    static func firstLikelyHour(
+        in forecast: [TrainingHourlyWeatherSnapshot]
+    ) -> TrainingHourlyWeatherSnapshot? {
+        forecast.first { $0.precipitationChance >= likelyThreshold }
+    }
+
+    static func peakChance(for weather: TrainingWeatherSnapshot) -> Double {
+        max(
+            weather.precipitationChance,
+            weather.hourlyForecast.map(\.precipitationChance).max() ?? 0
+        )
+    }
+}
+
+enum RunCastGearPolicy {
+    static func recommendations(for weather: TrainingWeatherSnapshot) -> [RunCastGearRecommendation] {
+        var recommendations: [RunCastGearRecommendation] = []
+
+        switch weather.feelsLikeCelsius {
+        case 27...:
+            recommendations.append(.init(
+                title: "Lightweight kit",
+                detail: "Breathable top, shorts, and extra fluids.",
+                symbolName: "tshirt.fill"
+            ))
+        case 16..<27:
+            recommendations.append(.init(
+                title: "Easy layers",
+                detail: "A light top and shorts should feel comfortable.",
+                symbolName: "tshirt.fill"
+            ))
+        case 7..<16:
+            recommendations.append(.init(
+                title: "Add a light layer",
+                detail: "Start with long sleeves or a removable quarter-zip.",
+                symbolName: "jacket.fill"
+            ))
+        default:
+            recommendations.append(.init(
+                title: "Cold-weather layers",
+                detail: "Use an insulating layer and protect hands and ears.",
+                symbolName: "snowflake"
+            ))
+        }
+
+        let peakRain = RunCastPrecipitationPolicy.peakChance(for: weather)
+        if peakRain >= 0.55 {
+            recommendations.append(.init(
+                title: "Rain shell recommended",
+                detail: "Choose a breathable shell and a brimmed cap.",
+                symbolName: "cloud.rain.fill"
+            ))
+        } else if peakRain >= 0.25 {
+            recommendations.append(.init(
+                title: "Pack a light shell",
+                detail: "A passing shower is possible during your window.",
+                symbolName: "umbrella.fill"
+            ))
+        }
+
+        if weather.windMetersPerSecond >= 8 {
+            recommendations.append(.init(
+                title: "Block the wind",
+                detail: "A close-fitting wind layer will reduce chill.",
+                symbolName: "wind"
+            ))
+        } else if weather.uvIndex >= 6 {
+            recommendations.append(.init(
+                title: "Sun protection",
+                detail: "Use sunscreen, sunglasses, and a ventilated cap.",
+                symbolName: "sun.max.fill"
+            ))
+        }
+
+        return Array(recommendations.prefix(3))
+    }
 }
 
 enum EnvironmentalLoadLevel: Equatable, Sendable {
@@ -64,6 +190,181 @@ struct WeatherTrainingGuidance: Equatable, Sendable {
     let detail: String
     let intensityReduction: Double
     let affectsReadinessScore: Bool
+
+    var requiresPlanReview: Bool {
+        level == .caution || level == .high
+    }
+}
+
+struct RaceWeatherSnapshot: Equatable, Sendable {
+    let symbolName: String
+    let highCelsius: Double
+    let lowCelsius: Double
+    let precipitationChance: Double
+}
+
+enum WeatherConditionsDisplayState: Equatable, Sendable {
+    case hidden
+    case waitingForLocation
+    case loading
+    case locationRequired
+    case unavailable
+    case available(TrainingWeatherSnapshot, WeatherTrainingGuidance)
+}
+
+enum TodayWeatherDisplayState: Equatable, Sendable {
+    case waitingForLocation
+    case loading
+    case locationRequired
+    case unavailable
+    case available(TrainingWeatherSnapshot)
+}
+
+enum TodayWeatherDisplayPolicy {
+    static func state(
+        weather: TrainingWeatherSnapshot?,
+        isLoading: Bool,
+        hasRequestedWeather: Bool,
+        locationDenied: Bool
+    ) -> TodayWeatherDisplayState {
+        if locationDenied { return .locationRequired }
+        if let weather { return .available(weather) }
+        if isLoading { return .loading }
+        return hasRequestedWeather ? .unavailable : .waitingForLocation
+    }
+}
+
+enum TodayWeatherRefreshAction: Equatable, Sendable {
+    case requestLocation
+    case loadWeather
+}
+
+enum TodayWeatherRefreshPolicy {
+    static let timeoutSeconds: TimeInterval = 12
+
+    static func action(hasLocation: Bool) -> TodayWeatherRefreshAction {
+        hasLocation ? .loadWeather : .requestLocation
+    }
+}
+
+struct TodayWeatherPresentation: Equatable, Sendable {
+    let title: String
+    let detail: String
+}
+
+enum WeatherTemperatureDisplayPolicy {
+    static func usesCelsius(locale: Locale = .current) -> Bool {
+        locale.measurementSystem != .us
+    }
+}
+
+enum TodayWeatherCopy {
+    static func title(for state: TodayWeatherDisplayState) -> String {
+        "RunCast"
+    }
+
+    static func detail(for state: TodayWeatherDisplayState) -> String {
+        switch state {
+        case .waitingForLocation: return "Finding your starting line..."
+        case .loading: return "Reading the sky..."
+        case .locationRequired: return "Location unlocks your local outlook"
+        case .unavailable: return "Forecast missed its split. Tap to retry."
+        case .available: return "Conditions are ready"
+        }
+    }
+
+    static func presentation(
+        for weather: TrainingWeatherSnapshot,
+        usesMetric: Bool
+    ) -> TodayWeatherPresentation {
+        let title: String
+        let humidHeat = weather.feelsLikeCelsius >= 30 && weather.humidity >= 0.65
+        if humidHeat || weather.feelsLikeCelsius >= 35 {
+            title = "RunCast · Ease the effort"
+        } else if weather.windMetersPerSecond >= 10 {
+            title = "RunCast · Wind may affect pace"
+        } else if weather.precipitationChance >= 0.55 {
+            title = "RunCast · Rain likely"
+        } else if weather.feelsLikeCelsius <= -5 {
+            title = "RunCast · Warm up longer"
+        } else if weather.uvIndex >= 7 {
+            title = "RunCast · Seek some shade"
+        } else {
+            title = "RunCast · Great conditions"
+        }
+
+        let temperatureUnit: UnitTemperature = usesMetric ? .celsius : .fahrenheit
+        let temperature = Measurement(value: weather.feelsLikeCelsius, unit: UnitTemperature.celsius)
+            .converted(to: temperatureUnit).value.rounded()
+        let precipitation = weather.precipitationChance < 0.20
+            ? "Dry"
+            : "\(Int((weather.precipitationChance * 100).rounded()))% rain"
+
+        let wind: String
+        if weather.windMetersPerSecond < 2 {
+            wind = "Calm"
+        } else if weather.windMetersPerSecond < 8 {
+            wind = "Light breeze"
+        } else {
+            let speed = usesMetric
+                ? weather.windMetersPerSecond * 3.6
+                : weather.windMetersPerSecond * 2.23694
+            wind = "\(Int(speed.rounded())) \(usesMetric ? "km/h" : "mph") wind"
+        }
+
+        return TodayWeatherPresentation(
+            title: title,
+            detail: "Feels \(Int(temperature))° · \(precipitation) · \(wind)"
+        )
+    }
+}
+
+enum WeatherConditionsDisplayPolicy {
+    static func state(
+        weather: TrainingWeatherSnapshot?,
+        isLoading: Bool,
+        hasRequestedWeather: Bool,
+        locationDenied: Bool,
+        workoutType: WorkoutType
+    ) -> WeatherConditionsDisplayState {
+        guard NativeTrainingGuidancePolicy.supportsWeather(for: workoutType) else {
+            return .hidden
+        }
+        if locationDenied { return .locationRequired }
+        if let weather,
+           let guidance = NativeTrainingGuidancePolicy.guidanceIfRelevant(
+            for: weather,
+            workoutType: workoutType
+           ) {
+            return .available(weather, guidance)
+        }
+        if isLoading { return .loading }
+        return hasRequestedWeather ? .unavailable : .waitingForLocation
+    }
+}
+
+enum RaceWeatherForecastPolicy {
+    static func isWithinForecastWindow(
+        raceDate: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        let start = calendar.startOfDay(for: now)
+        let raceDay = calendar.startOfDay(for: raceDate)
+        guard let days = calendar.dateComponents([.day], from: start, to: raceDay).day else {
+            return false
+        }
+        return (0...10).contains(days)
+    }
+}
+
+enum TodayTrainingContextPresentationPolicy {
+    static func shouldShow(
+        plannedWorkout: DailyWorkout?,
+        hasCompletedActivity: Bool
+    ) -> Bool {
+        plannedWorkout != nil && !hasCompletedActivity
+    }
 }
 
 enum CalibrationConfidenceLevel: String, Equatable, Sendable {
@@ -78,6 +379,14 @@ struct ReadinessCalibrationAssessment: Equatable, Sendable {
 }
 
 enum NativeTrainingGuidancePolicy {
+    static func guidanceIfRelevant(
+        for weather: TrainingWeatherSnapshot?,
+        workoutType: WorkoutType
+    ) -> WeatherTrainingGuidance? {
+        guard let weather, supportsWeather(for: workoutType) else { return nil }
+        return weatherGuidance(for: weather, workoutType: workoutType)
+    }
+
     static func zoneTarget(for workoutType: WorkoutType) -> TrainingZoneTarget? {
         switch workoutType {
         case .recoveryRun:
@@ -97,7 +406,7 @@ enum NativeTrainingGuidancePolicy {
         for weather: TrainingWeatherSnapshot,
         workoutType: WorkoutType
     ) -> WeatherTrainingGuidance {
-        guard workoutType.isRunning else {
+        guard supportsWeather(for: workoutType) else {
             return WeatherTrainingGuidance(
                 level: .favorable,
                 title: "Indoor plan unaffected",
@@ -145,6 +454,16 @@ enum NativeTrainingGuidancePolicy {
             intensityReduction: 0,
             affectsReadinessScore: false
         )
+    }
+
+    static func supportsWeather(for workoutType: WorkoutType) -> Bool {
+        switch workoutType {
+        case .easyRun, .longRun, .tempoRun, .intervalRun, .hillRun, .recoveryRun,
+             .cycling, .walking, .hiking:
+            return true
+        default:
+            return false
+        }
     }
 }
 

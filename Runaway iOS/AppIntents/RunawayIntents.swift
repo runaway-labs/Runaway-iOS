@@ -12,12 +12,12 @@ import Foundation
 
 struct CheckTrainingPhaseIntent: AppIntent {
     static var title: LocalizedStringResource = "Check Training Phase"
-    static var description = IntentDescription("See your current training phase and insights from your digital twin.")
+    static var description = IntentDescription("See your current training phase and locally generated guidance.")
 
     func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
         let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
         let phase = defaults?.string(forKey: "current_training_phase") ?? "Training steady"
-        let message = defaults?.string(forKey: "widget_twin_message") ?? "Keep at it."
+        let message = defaults?.string(forKey: "becoming_headline") ?? "Keep the week moving."
         let response = "\(phase). \(message)"
         return .result(value: response, dialog: IntentDialog(stringLiteral: response))
     }

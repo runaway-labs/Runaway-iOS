@@ -20,6 +20,7 @@ struct PlanView: View {
     @Environment(DataManager.self) var dataManager
     @EnvironmentObject var themeManager: ThemeManager
     @StateObject private var viewModel = PlanViewModel()
+    @ObservedObject private var unitPreferences = UnitPreferences.shared
     @State private var selectedSection: RaceSection = .upcoming
     @State private var showingWorkoutDetail: DailyWorkout?
     @State private var showingTrainingGuidelines = false
@@ -103,7 +104,7 @@ struct PlanView: View {
                 Task { await loadAll() }
             }
         }
-        .task { await loadAll() }
+        .task(id: dataManager.athlete?.id) { allGoals = []; await loadAll() }
     }
 
     // MARK: - Load
@@ -117,15 +118,7 @@ struct PlanView: View {
             #if DEBUG
             print("🔍 PlanView: Refresh fetched \(races.count) races")
             #endif
-            // Only update if we actually got data, to prevent flickering/wiping on network blips
-            if !races.isEmpty {
-                allGoals = races
-            } else if allGoals.isEmpty {
-                // If we had nothing and still have nothing, stay empty
-                allGoals = []
-            }
-            // If we HAD data and got 0 back, we might be in a temporary state (refreshing),
-            // so we keep the old data visible.
+            allGoals = races
         } catch {
             #if DEBUG
             print("❌ PlanView: Refresh failed: \(error)")
@@ -177,11 +170,7 @@ struct PlanView: View {
                         )
                     }
 
-                    WeekOverviewSection(
-                        plan: plan,
-                        activities: dataManager.activities,
-                        onWorkoutTap: { showingWorkoutDetail = $0 }
-                    )
+                    TrainingWeekTimeline(plan: plan, onSelect: { showingWorkoutDetail = $0 })
 
                     if let insights = viewModel.adaptiveInsights {
                         AdaptiveInsightsCard(insights: insights)
@@ -265,7 +254,7 @@ struct RaceCarousel: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 200)
+            .frame(height: 228)
 
             if races.count > 1 {
                 HStack(spacing: 6) {
@@ -290,6 +279,7 @@ struct NextRaceCard: View {
     let total: Int
     let onEdit: (() -> Void)?
     @State private var showingCourseRecon = false
+    @State private var raceWeather: RaceWeatherSnapshot?
 
     private var daysUntil: Int {
         guard let d = race.parsedDate else { return 0 }
@@ -416,6 +406,21 @@ struct NextRaceCard: View {
                 .foregroundColor(urgencyColor)
                 .padding(.top, 12)
             }
+
+            if let raceWeather {
+                HStack(spacing: 8) {
+                    Image(systemName: raceWeather.symbolName)
+                        .foregroundColor(AppTheme.Colors.strideBlueLight)
+                    Text("Race-day outlook")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
+                    Spacer(minLength: 8)
+                    Text(raceWeatherSummary(raceWeather))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
+                }
+                .padding(.top, 10)
+            }
         }
         .padding(16)
         .background(AppTheme.Colors.DarkMode.cardBackground)
@@ -424,6 +429,21 @@ struct NextRaceCard: View {
         .sheet(isPresented: $showingCourseRecon) {
             CourseReconView(race: race)
         }
+        .task(id: race.raceDate) {
+            raceWeather = await NativeTrainingContextService.shared.raceForecast(for: race)
+        }
+    }
+
+
+    private func raceWeatherSummary(_ weather: RaceWeatherSnapshot) -> String {
+        let usesMetric = UnitPreferences.shared.distanceUnit == .kilometers
+        let temperatureUnit: UnitTemperature = usesMetric ? .celsius : .fahrenheit
+        let high = Measurement(value: weather.highCelsius, unit: UnitTemperature.celsius)
+            .converted(to: temperatureUnit).value.rounded()
+        let low = Measurement(value: weather.lowCelsius, unit: UnitTemperature.celsius)
+            .converted(to: temperatureUnit).value.rounded()
+        let rain = Int((weather.precipitationChance * 100).rounded())
+        return "H \(Int(high))° · L \(Int(low))° · \(rain)% rain"
     }
 }
 
@@ -512,6 +532,7 @@ struct PastRaceRow: View {
 // MARK: - Plan Header Card
 
 struct PlanHeaderCard: View {
+    @ObservedObject private var unitPreferences = UnitPreferences.shared
     let plan: WeeklyTrainingPlan
     let insights: AdaptiveInsights?
     let onRegenerate: () -> Void
@@ -545,6 +566,8 @@ struct PlanHeaderCard: View {
                 }
                 .foregroundColor(AppTheme.Colors.accent)
                 .disabled(isRegenerating)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel("Regenerate remaining training plan")
             }
 
             Divider()
@@ -553,12 +576,7 @@ struct PlanHeaderCard: View {
                 PlanStatItem(title: "Planned",
                              value: UnitFormatter.formatMiles(plan.totalMileage),
                              icon: "target")
-                if let ins = insights {
-                    PlanStatItem(title: "Completed",
-                                 value: "\(ins.adherencePercentage)%",
-                                 icon: "checkmark.circle",
-                                 valueColor: ins.adherenceRate >= 0.8 ? .green : .orange)
-                }
+                PlanStatItem(title: "Completed", value: "\(PlanProgressPresentation(plan: plan).completedSessions)/\(PlanProgressPresentation(plan: plan).scheduledSessions)", icon: "checkmark.circle", valueColor: TrainingProgressStyle.mint)
                 PlanStatItem(title: "Workouts",
                              value: "\(plan.workouts.filter { $0.workoutType != .rest }.count)",
                              icon: "figure.run")

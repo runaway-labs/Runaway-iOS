@@ -1,184 +1,62 @@
 import Foundation
 import Supabase
 
-// Fetches and refreshes personal bests by querying all activities in the DB
-// (not just the in-memory subset) and upserting to athlete_personal_bests.
+// Read-only saved-record presentation. Legacy estimates are retained in the
+// database for a reviewed repair; they do not become achievement badges.
 class PersonalBestService {
     static let shared = PersonalBestService()
     private init() {}
 
-    // MARK: - Fetch stored PRs
-
     func fetchPRs(athleteId: Int) async throws -> [PersonalBest] {
-        let prs: [PersonalBest] = try await supabase
-            .from("athlete_personal_bests")
-            .select()
-            .eq("athlete_id", value: athleteId)
-            .order("distance_label")
-            .execute()
-            .value
-        return prs
+        try await supabase.from("athlete_personal_bests").select()
+            .eq("athlete_id", value: athleteId).order("distance_label").execute().value
     }
 
-    // MARK: - Recompute from full activity history
+    func fetchSupportedPRs(athleteId: Int) async throws -> [SupportedPersonalBest] {
+        let records = try await fetchPRs(athleteId: athleteId)
+        let ids = Array(Set(records.compactMap(\.activityId)))
+        guard !ids.isEmpty else { return [] }
+        let rows: [EvidenceRow] = try await supabase.from("activities")
+            .select("id,athlete_id,name,activity_types(name),start_time,activity_date,distance,elapsed_time,flagged,splits,map_summary_polyline")
+            .eq("athlete_id", value: athleteId).in("id", values: ids).execute().value
+        let sources = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return records.compactMap { record in
+            guard record.athleteId == athleteId,
+                  let id = record.activityId, let source = sources[id],
+                  source.athlete_id == athleteId,
+                  let date = source.start_time ?? source.activity_date,
+                  abs(record.achievedAt.timeIntervalSince(date)) < 2,
+                  let target = PRDistance.allCases.first(where: { $0.label == record.distanceLabel }),
+                  abs(record.distanceMeters - target.nominalMeters) < 1,
+                  PersonalRecordEvidencePolicy.supports(targetMeters: target.nominalMeters,
+                      timeSeconds: record.timeSeconds, kind: ProgressActivityKind(source.activity_types?.name ?? ""),
+                      flagged: source.flagged == true, activityMeters: source.distance ?? 0,
+                      activitySeconds: source.elapsed_time ?? 0, splits: source.splits ?? []) else { return nil }
+            let activity = LocalActivity(id: id, name: source.name ?? "Run", type: source.activity_types?.name ?? "Run",
+                summary_polyline: source.map_summary_polyline ?? "", distance: source.distance ?? 0,
+                start_date: date, elapsed_time: source.elapsed_time ?? 0)
+            return SupportedPersonalBest(record: record, activity: activity)
+        }
+    }
 
-    // Compares activity-level PRs and split-level PRs, upserts the faster of the two.
+    /// Compatibility for older callers. Opening a screen must not rewrite
+    /// production bests with broad distance bins or projected split paces.
     func recomputeAndSave(athleteId: Int) async throws -> [PersonalBest] {
-        var saved: [PersonalBest] = []
-
-        for distance in PRDistance.allCases {
-            async let activityPR = bestActivity(athleteId: athleteId, distance: distance)
-            async let splitPR = bestSplitTime(athleteId: athleteId, distance: distance)
-
-            let (activity, split) = try await (activityPR, splitPR)
-
-            let best: PersonalBestCandidate?
-            switch (activity, split) {
-            case (nil, nil):       continue
-            case (let a?, nil):    best = a
-            case (nil, let s?):    best = s
-            case (let a?, let s?): best = a.timeSeconds <= s.timeSeconds ? a : s
-            }
-
-            guard let pr = best else { continue }
-            let upserted = try await upsert(pr, athleteId: athleteId)
-            saved.append(upserted)
-        }
-
-        return saved
+        try await fetchSupportedPRs(athleteId: athleteId).map(\.record)
     }
 
-    // MARK: - Private helpers
-
-    private struct ActivityRow: Decodable {
+    private struct EvidenceRow: Decodable {
         let id: Int
-        let elapsedTime: Int?
-        let startTime: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case elapsedTime = "elapsed_time"
-            case startTime   = "start_time"
-        }
-    }
-
-    private func bestActivity(athleteId: Int, distance: PRDistance) async throws -> PersonalBestCandidate? {
-        let range = distance.metersRange
-        // Require at least 3:00/km pace — filters GPS-corrupted or mis-categorized activities
-        let minElapsedTime = Int(range.lowerBound * 0.18)
-
-        let rows: [ActivityRow] = try await supabase
-            .from("activities")
-            .select("id, elapsed_time, start_time")
-            .eq("athlete_id", value: athleteId)
-            .gte("distance", value: range.lowerBound)
-            .lte("distance", value: range.upperBound)
-            .gte("elapsed_time", value: minElapsedTime)
-            .not("elapsed_time", operator: .is, value: AnyJSON.null)
-            .order("elapsed_time", ascending: true)
-            .limit(1)
-            .execute()
-            .value
-
-        guard let best = rows.first,
-              let elapsed = best.elapsedTime,
-              elapsed > 0 else { return nil }
-
-        return PersonalBestCandidate(
-            distanceLabel: distance.label,
-            distanceMeters: distance.nominalMeters,
-            timeSeconds: elapsed,
-            activityId: best.id,
-            achievedAt: best.startTime ?? Date()
-        )
-    }
-
-    private struct SplitPRRow: Decodable {
-        let activityId: Int
-        let elapsedSeconds: Int
-        let achievedAt: Date
-
-        enum CodingKeys: String, CodingKey {
-            case activityId     = "activity_id"
-            case elapsedSeconds = "elapsed_seconds"
-            case achievedAt     = "achieved_at"
-        }
-    }
-
-    private struct SplitPRParams: Encodable {
-        let p_athlete_id: Int
-        let p_window_splits: Int
-        let p_min_dist: Double
-        let p_max_dist: Double
-    }
-
-    private func bestSplitTime(athleteId: Int, distance: PRDistance) async throws -> PersonalBestCandidate? {
-        if distance == .mile {
-            return try await bestMileFromSplits(athleteId: athleteId)
-        }
-        guard let windowSize = distance.splitWindowSize else { return nil }
-        let range = distance.metersRange
-
-        let rows: [SplitPRRow] = try await supabase
-            .rpc("best_split_pr", params: SplitPRParams(
-                p_athlete_id: athleteId,
-                p_window_splits: windowSize,
-                p_min_dist: range.lowerBound,
-                p_max_dist: range.upperBound
-            ))
-            .execute()
-            .value
-
-        guard let best = rows.first else { return nil }
-
-        return PersonalBestCandidate(
-            distanceLabel: distance.label,
-            distanceMeters: distance.nominalMeters,
-            timeSeconds: best.elapsedSeconds,
-            activityId: best.activityId,
-            achievedAt: best.achievedAt
-        )
-    }
-
-    // Finds the fastest 1km split and scales to mile (1609m).
-    // 1km splits don't align to exactly 1 mile, so we use pace from the best km.
-    private func bestMileFromSplits(athleteId: Int) async throws -> PersonalBestCandidate? {
-        let rows: [SplitPRRow] = try await supabase
-            .rpc("best_split_pr", params: SplitPRParams(
-                p_athlete_id: athleteId,
-                p_window_splits: 1,
-                p_min_dist: 900,
-                p_max_dist: 1100
-            ))
-            .execute()
-            .value
-
-        guard let best = rows.first else { return nil }
-
-        let mileSeconds = Int(Double(best.elapsedSeconds) * 1609.34 / 1000.0)
-        return PersonalBestCandidate(
-            distanceLabel: PRDistance.mile.label,
-            distanceMeters: PRDistance.mile.nominalMeters,
-            timeSeconds: mileSeconds,
-            activityId: best.activityId,
-            achievedAt: best.achievedAt
-        )
-    }
-
-    private func upsert(_ candidate: PersonalBestCandidate, athleteId: Int) async throws -> PersonalBest {
-        let payload = PersonalBestUpsertPayload(candidate: candidate, athleteId: athleteId)
-
-        let result: [PersonalBest] = try await supabase
-            .from("athlete_personal_bests")
-            .upsert(payload, onConflict: "athlete_id,distance_label")
-            .select()
-            .execute()
-            .value
-
-        guard let saved = result.first else {
-            throw PersonalBestServiceError.missingServerGeneratedRecord
-        }
-        return saved
+        let athlete_id: Int
+        let name: String?
+        let activity_types: TrainingProgressRemoteActivity.ActivityType?
+        let start_time: Date?
+        let activity_date: Date?
+        let distance: Double?
+        let elapsed_time: Double?
+        let flagged: Bool?
+        let splits: [RecordedEffortSplit]?
+        let map_summary_polyline: String?
     }
 }
 

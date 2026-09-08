@@ -23,23 +23,30 @@ enum TodayActivityCompletionPolicy {
     }
 }
 
+enum TrainingChoiceAvailabilityPolicy {
+    static func requiresProfileSetup(needsPersonalization: Bool) -> Bool {
+        needsPersonalization
+    }
+}
+
 // MARK: - Workout Components
 
 struct TodaysFocusCard: View {
     @Environment(DataManager.self) var dataManager
     @StateObject private var restDayService = RestDayService.shared
     @StateObject private var readinessService = ReadinessService.shared
+    @StateObject private var nativeContext = NativeTrainingContextService.shared
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
-    @State private var showingWorkoutDetail = false
     @State private var showingTrainingDecision = false
+    @State private var preferredBecomingChoice: BecomingChoice?
     @State private var changeReceipt: TodayWorkoutAdjustmentResult?
     @State private var planBeforeAdjustment: WeeklyTrainingPlan?
+    @State private var adjustmentErrorMessage: String?
+    @State private var isApplyingAdjustment = false
 
     private var todaysWorkout: DailyWorkout? {
-        guard let plan = dataManager.currentWeeklyPlan else { return nil }
-        let today = Calendar.current.component(.weekday, from: Date())
-        let todayDayOfWeek = DayOfWeek.allCases.first { $0.calendarWeekday == today }
-        return plan.workouts.first { $0.dayOfWeek == todayDayOfWeek }
+        guard let plan = dataManager.currentWeeklyPlan, plan.isCurrentWeek else { return nil }
+        return plan.workout(for: Date())
     }
 
     /// Check if there's an activity logged today
@@ -122,6 +129,42 @@ struct TodaysFocusCard: View {
         )
     }
 
+    private var weatherGuidance: WeatherTrainingGuidance? {
+        guard let workout = todaysWorkout else { return nil }
+        return NativeTrainingGuidancePolicy.guidanceIfRelevant(
+            for: nativeContext.weather,
+            workoutType: workout.workoutType
+        )
+    }
+
+    private var decisionRecommendation: TodayRecommendation {
+        if recommendation.directive == .recover || recommendation.directive == .reduceIntensity {
+            return recommendation
+        }
+        guard let workout = todaysWorkout,
+              let weatherGuidance,
+              weatherGuidance.requiresPlanReview else {
+            return recommendation
+        }
+        return TodayRecommendation(
+            directive: .reduceIntensity,
+            status: "Weather",
+            title: weatherGuidance.title,
+            detail: weatherGuidance.detail,
+            systemImage: nativeContext.weather?.symbolName ?? "cloud.sun.fill",
+            workoutType: workout.workoutType,
+            reason: "Weather adjusts the session, not your biological readiness.",
+            adjustment: .easierWorkout
+        )
+    }
+
+    private var trainingAlternatives: [WorkoutType] {
+        TodayRecommendationPolicy.workoutAlternatives(
+            profile: trainingProfileStore.profile,
+            readinessScore: readinessService.todaysReadiness?.score
+        )
+    }
+
     private func activityAccent(for accent: TodayRecommendationAccent) -> Color {
         switch accent {
         case .runningPrimary:
@@ -136,13 +179,30 @@ struct TodaysFocusCard: View {
     }
 
     private var shouldOfferTrainingDecision: Bool {
-        guard todaysActivity == nil,
-              let workout = todaysWorkout,
-              workout.workoutType != .rest,
-              !workout.description.hasPrefix("Adjusted for today's readiness") else {
-            return false
-        }
-        return recommendation.directive == .recover || recommendation.directive == .reduceIntensity
+        TodayRecommendationPolicy.canChooseTodaysTraining(
+            plannedWorkout: decisionWorkout,
+            hasCompletedActivity: todaysActivity != nil
+        )
+    }
+
+    private var decisionWorkout: DailyWorkout? {
+        if let todaysWorkout { return todaysWorkout }
+        guard todaysActivity == nil, let workoutType = recommendation.workoutType else { return nil }
+        let date = Calendar.current.startOfDay(for: Date())
+        return DailyWorkout(
+            id: "generated-today-\(Int(date.timeIntervalSince1970))",
+            date: date,
+            dayOfWeek: DayOfWeek.from(date: date),
+            workoutType: workoutType,
+            title: recommendation.title,
+            description: recommendation.detail,
+            duration: nil,
+            distance: nil,
+            targetPace: nil,
+            exercises: nil,
+            isCompleted: false,
+            completedActivityId: nil
+        )
     }
 
     private var nextUpLabel: String {
@@ -150,6 +210,31 @@ struct TodaysFocusCard: View {
         let names = ["", "SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
         let name = weekday < names.count ? names[weekday] : "TODAY"
         return "NEXT UP · \(name)"
+    }
+
+    private var becomingSnapshot: BecomingSnapshot {
+        let workoutType = recommendation.workoutType
+        let demand: BecomingDemand
+        if workoutType?.isHighIntensity == true || workoutType?.isLowerBodyDemanding == true {
+            demand = .high
+        } else if workoutType != nil && workoutType != .rest {
+            demand = .moderate
+        } else {
+            demand = .low
+        }
+
+        let today = Calendar.current.startOfDay(for: Date())
+        let futureSessionCount = dataManager.currentWeeklyPlan?.workouts.filter {
+            !$0.isCompleted && $0.date > today
+        }.count ?? 0
+
+        return BecomingEngine.simulate(
+            readinessScore: readinessService.todaysReadiness?.score,
+            plannedTitle: recommendation.title,
+            plannedDemand: demand,
+            alternativeTitles: trainingAlternatives.map(\.displayName),
+            remainingSessionCount: futureSessionCount
+        )
     }
 
     var body: some View {
@@ -240,7 +325,7 @@ struct TodaysFocusCard: View {
 
             case .plannedWorkout(let workout, let presentation):
                 Button {
-                    showingWorkoutDetail = true
+                    presentTrainingDecision()
                 } label: {
                     HStack(spacing: 12) {
                         ZStack {
@@ -298,8 +383,8 @@ struct TodaysFocusCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("View \(workout.title) details")
-                .accessibilityHint("Opens the planned workout details.")
+                .accessibilityLabel("Change \(workout.title)")
+                .accessibilityHint("Opens today's training choices and adapts the remaining week.")
 
             case .readyToRun:
                 HStack(spacing: 12) {
@@ -356,68 +441,77 @@ struct TodaysFocusCard: View {
 
             case .readinessRecommendation(let recommendation):
                 let presentation = TodayRecommendationPresentation(recommendation: recommendation)
-                HStack(spacing: 12) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 2)
-                            .fill(activityAccent(for: presentation.accent).opacity(0.16))
-                            .frame(width: 44, height: 44)
-                        Image(systemName: recommendation.systemImage)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(activityAccent(for: presentation.accent))
-                    }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(recommendation.title)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white)
-                        Text(recommendation.detail)
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
-                            .lineLimit(2)
-                        if let reason = recommendation.reason {
-                            Text(reason)
-                                .font(.system(size: 11, design: .rounded))
-                                .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
-                                .lineLimit(1)
+                Button {
+                    presentTrainingDecision()
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 2)
+                                .fill(activityAccent(for: presentation.accent).opacity(0.16))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: recommendation.systemImage)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(activityAccent(for: presentation.accent))
                         }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(recommendation.title)
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white)
+                            Text(recommendation.detail)
+                                .font(.system(size: 12, design: .rounded))
+                                .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
+                                .lineLimit(2)
+                            if let reason = recommendation.reason {
+                                Text(reason)
+                                    .font(.system(size: 11, design: .rounded))
+                                    .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                     }
-                    Spacer(minLength: 0)
+                    .contentShape(Rectangle())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(AppTheme.Colors.DarkMode.surfaceBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(AppTheme.Colors.DarkMode.surfaceBackground)
-                .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
+                .buttonStyle(.plain)
+                .accessibilityLabel("Change \(recommendation.title)")
+                .accessibilityHint("Opens today's training choices and adapts the remaining week.")
             }
 
-            if case let .plannedWorkout(workout, _) = todaysFocus, todaysActivity == nil {
+            if let workout = todaysWorkout,
+               recommendation.workoutType == workout.workoutType,
+               workout.workoutType != .rest,
+               TodayTrainingContextPresentationPolicy.shouldShow(
+                plannedWorkout: workout,
+                hasCompletedActivity: todaysActivity != nil
+               ) {
                 NativeTrainingSummaryStrip(workout: workout)
             }
 
 
             if shouldOfferTrainingDecision {
-                Button {
-                    showingTrainingDecision = true
-                } label: {
-                    HStack(spacing: 9) {
+                Button { presentTrainingDecision() } label: {
+                    HStack(spacing: 12) {
                         Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 13, weight: .semibold))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Review today's plan")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            Text("Choose a safer version without changing the rest of your week")
-                                .font(.system(size: 11, design: .rounded))
-                                .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(isApplyingAdjustment ? "Updating your week..." : "Adjust today")
+                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            Text("Choose a session and rebalance the week")
+                                .font(.caption).foregroundStyle(TrainingProgressStyle.secondary)
                         }
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .foregroundColor(AppTheme.Colors.success)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.Colors.success.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
-                }
-                .buttonStyle(.plain)
+                        Image(systemName: "chevron.right").font(.caption)
+                    }.foregroundStyle(TrainingProgressStyle.blue)
+                        .padding(14).frame(minHeight: 56)
+                        .background(TrainingProgressStyle.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+                }.buttonStyle(.plain).disabled(isApplyingAdjustment)
+                    .accessibilityIdentifier("adjustTodayButton")
             }
 
             if let receipt = changeReceipt {
@@ -433,9 +527,22 @@ struct TodaysFocusCard: View {
                             .font(.system(size: 11, design: .rounded))
                             .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let before = planBeforeAdjustment {
+                            DisclosureGroup("What changed") {
+                                ForEach(PlanProgressPresentation.changes(from: before, to: receipt.plan), id: \.self) { change in
+                                    Text(change).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }.font(.caption).tint(TrainingProgressStyle.mint)
+                        }
                     }
                     Spacer(minLength: 0)
                     Button("Undo") {
+                        guard let current = dataManager.currentWeeklyPlan,
+                              current.isCurrentWeek,
+                              (try? JSONEncoder().encode(current.workouts)) == (try? JSONEncoder().encode(receipt.plan.workouts)) else {
+                            adjustmentErrorMessage = "Your plan has changed since this adjustment. Review today's choices so completed work stays protected."
+                            return
+                        }
                         if let planBeforeAdjustment {
                             do {
                                 try dataManager.updateCurrentWeeklyPlan(planBeforeAdjustment)
@@ -468,31 +575,119 @@ struct TodaysFocusCard: View {
             RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium + 2)
                 .stroke(Color.white.opacity(0.07), lineWidth: 1)
         )
-        .sheet(isPresented: $showingWorkoutDetail) {
-            if let workout = todaysWorkout {
-                WorkoutDetailSheet(workout: workout)
-            }
+        .task(id: widgetSnapshotSignature) {
+            syncBecomingWidget()
+            await drainPendingWidgetChoice()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task { await drainPendingWidgetChoice() }
         }
         .sheet(isPresented: $showingTrainingDecision) {
-            if let workout = todaysWorkout {
-                TrainingDecisionSheet(workout: workout, recommendation: recommendation) { adjustment in
-                    guard let plan = dataManager.currentWeeklyPlan,
-                          let result = TodayRecommendationPolicy.applying(
-                            adjustment,
-                            to: plan,
-                            readinessScore: readinessService.todaysReadiness?.score
-                          ) else { return }
-                    do {
-                        try dataManager.updateCurrentWeeklyPlan(result.plan)
-                        planBeforeAdjustment = plan
-                        changeReceipt = result
-                    } catch {
-                        #if DEBUG
-                        print("Failed to update plan: \(error)")
-                        #endif
-                    }
+            if let workout = decisionWorkout {
+                TrainingDecisionSheet(
+                    workout: workout,
+                    recommendation: decisionRecommendation,
+                    workoutAlternatives: trainingAlternatives,
+                    needsTrainingProfile: trainingProfileStore.needsPersonalization,
+                    preferredChoice: preferredBecomingChoice
+                ) { adjustment in
+                    Task { await applyTrainingDecision(adjustment) }
                 }
             }
+        }
+        .alert("Plan update failed", isPresented: Binding(
+            get: { adjustmentErrorMessage != nil },
+            set: { if !$0 { adjustmentErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
+        } message: {
+            Text(adjustmentErrorMessage ?? "Please try again.")
+        }
+    }
+
+    private var workoutChoiceDetail: String {
+        guard let workout = decisionWorkout else { return "Choose what feels right today" }
+        if workout.workoutType == .rest {
+            return "Keep recovery or add a workout; the remaining week will adapt"
+        }
+        if weatherGuidance?.requiresPlanReview == true && recommendation.directive == .proceed {
+            return "Conditions suggest adjusting; the remaining week will adapt"
+        }
+        return "Rest, scale back, or keep \(workout.title); the remaining week will adapt"
+    }
+
+    private func presentTrainingDecision(preferredChoice: BecomingChoice? = nil) {
+        preferredBecomingChoice = preferredChoice
+        showingTrainingDecision = true
+    }
+
+    private var widgetSnapshotSignature: String {
+        [becomingSnapshot.headline, String(describing: becomingSnapshot.recommendedChoice),
+         String(readinessService.todaysReadiness?.score ?? -1), decisionWorkout?.id ?? "none",
+         weatherGuidance?.title ?? ""].joined(separator: "|")
+    }
+
+    @MainActor
+    private func syncBecomingWidget() {
+        WidgetSyncService.shared.updateBecomingData(
+            snapshot: becomingSnapshot,
+            workout: decisionWorkout,
+            readinessScore: readinessService.todaysReadiness?.score,
+            weatherTitle: weatherGuidance?.title,
+            weatherDetail: weatherGuidance?.detail
+        )
+    }
+
+    @MainActor
+    private func drainPendingWidgetChoice() async {
+        let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier)
+        guard let choice = WidgetBecomingActionPolicy.consumePendingChoice(from: defaults) else { return }
+        guard choice != "planned" else { syncBecomingWidget(); return }
+        let alternate = trainingAlternatives.first { $0 != decisionWorkout?.workoutType }
+        guard let adjustment = WidgetBecomingActionPolicy.adjustment(for: choice, alternate: alternate) else { return }
+        await applyTrainingDecision(adjustment)
+        syncBecomingWidget()
+    }
+
+    @MainActor
+    private func applyTrainingDecision(_ adjustment: TodayWorkoutAdjustment) async {
+        guard !isApplyingAdjustment else { return }
+        isApplyingAdjustment = true
+        defer { isApplyingAdjustment = false }
+        guard let targetWorkout = decisionWorkout else {
+            adjustmentErrorMessage = "Today's recommendation could not be resolved. Refresh Today and try again."
+            return
+        }
+
+        do {
+            let plan: WeeklyTrainingPlan
+            if let currentPlan = dataManager.currentWeeklyPlan {
+                plan = currentPlan
+            } else {
+                plan = try await dataManager.generateTrainingPlan(
+                    profile: trainingProfileStore.profile,
+                    scope: .initialCurrentWeek
+                )
+            }
+            guard let localResult = TodayRecommendationPolicy.applying(
+                adjustment,
+                to: plan,
+                on: targetWorkout.date,
+                readinessScore: readinessService.todaysReadiness?.score
+            ) else {
+                adjustmentErrorMessage = "That training change could not be applied. Refresh Today and try again."
+                return
+            }
+            let adapted = try await TodayRecommendationPolicy.adaptingRemainingWeek(
+                localResult,
+                profile: trainingProfileStore.profile,
+                on: targetWorkout.date
+            )
+            try dataManager.updateCurrentWeeklyPlan(adapted.plan, profile: trainingProfileStore.profile)
+            planBeforeAdjustment = plan
+            changeReceipt = adapted
+        } catch {
+            adjustmentErrorMessage = error.localizedDescription
         }
     }
 }
@@ -630,9 +825,18 @@ struct TrainingPersonalizationPromptCard: View {
 
 private struct TrainingDecisionSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
+    @State private var showingTrainingProfile = false
     let workout: DailyWorkout
     let recommendation: TodayRecommendation
+    let workoutAlternatives: [WorkoutType]
+    let needsTrainingProfile: Bool
+    let preferredChoice: BecomingChoice?
     let onSelect: (TodayWorkoutAdjustment) -> Void
+
+    private var preferredAlternative: WorkoutType? {
+        workoutAlternatives.first { $0 != workout.workoutType } ?? workoutAlternatives.first
+    }
 
     var body: some View {
         NavigationStack {
@@ -677,41 +881,83 @@ private struct TrainingDecisionSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
 
                 VStack(spacing: 10) {
-                    if recommendation.directive == .recover {
+                    if workout.workoutType == .rest {
+                        keepPlanButton(
+                            title: "Keep the rest day",
+                            detail: "Protect recovery and leave today's load at zero",
+                            icon: "moon.zzz.fill",
+                            emphasized: preferredChoice.map { $0 == .planned } ?? true
+                        )
+                        if TrainingChoiceAvailabilityPolicy.requiresProfileSetup(
+                            needsPersonalization: needsTrainingProfile
+                        ) {
+                            trainingProfileBlocker
+                        } else {
+                            ForEach(workoutAlternatives, id: \.self) { workoutType in
+                                decisionButton(
+                                    title: "Add \(workoutType.displayName.lowercased())",
+                                    detail: "Add this session and rebalance the rest of the week",
+                                    icon: workoutType.icon,
+                                    adjustment: .chosenWorkout(workoutType),
+                                    emphasized: preferredChoice == .alternate && workoutType == preferredAlternative
+                                )
+                            }
+                        }
+                    } else if recommendation.directive == .recover {
                         decisionButton(
                             title: "Take a recovery day",
-                            detail: "Remove today's load and leave the rest of the week intact",
+                            detail: "Remove today's load and rebalance future sessions",
                             icon: "moon.zzz.fill",
                             adjustment: .recoveryDay,
-                            emphasized: true
+                            emphasized: preferredChoice.map { $0 == .recover } ?? true
                         )
-                        decisionButton(
-                            title: "Make it an easy session",
-                            detail: "Reduce running distance by 35% and remove intensity",
-                            icon: "figure.walk",
-                            adjustment: .easierWorkout
-                        )
-                    } else {
                         decisionButton(
                             title: "Make it an easy session",
                             detail: "Reduce running distance by 35% and remove intensity",
                             icon: "figure.walk",
                             adjustment: .easierWorkout,
-                            emphasized: true
+                            emphasized: preferredChoice == .easier
+                        )
+                    } else {
+                        decisionButton(
+                            title: "Make it an easy session",
+                            detail: "Swap today for lower-load recovery work",
+                            icon: "figure.walk",
+                            adjustment: .easierWorkout,
+                            emphasized: preferredChoice.map { $0 == .easier } ?? true
                         )
                         decisionButton(
                             title: "Take a recovery day",
-                            detail: "Remove today's load and leave the rest of the week intact",
+                            detail: "Remove today's load and rebalance future sessions",
                             icon: "moon.zzz.fill",
-                            adjustment: .recoveryDay
+                            adjustment: .recoveryDay,
+                            emphasized: preferredChoice == .recover
                         )
                     }
 
-                    Button("Keep original workout") { dismiss() }
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                    if workout.workoutType != .rest && !needsTrainingProfile {
+                        ForEach(
+                            workoutAlternatives.filter { $0 != workout.workoutType },
+                            id: \.self
+                        ) { workoutType in
+                            decisionButton(
+                                title: "Switch to \(workoutType.displayName.lowercased())",
+                                detail: "Use this profile activity and rebalance future sessions",
+                                icon: workoutType.icon,
+                                adjustment: .chosenWorkout(workoutType),
+                                emphasized: preferredChoice == .alternate && workoutType == preferredAlternative
+                            )
+                        }
+                    }
+
+                    if workout.workoutType != .rest {
+                        keepPlanButton(
+                            title: "Do \(workout.title)",
+                            detail: "Keep the planned workout exactly as scheduled",
+                            icon: workout.workoutType.icon,
+                            emphasized: preferredChoice == .planned
+                        )
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -728,6 +974,39 @@ private struct TrainingDecisionSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showingTrainingProfile) {
+            TrainingProfileView(route: TrainingProfileRoute(store: trainingProfileStore))
+        }
+    }
+
+    private var trainingProfileBlocker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Training profile required", systemImage: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundColor(AppTheme.Colors.warmAmber)
+            Text("Choose your activities and weekly frequency before replacing a recovery day. This keeps today's choice and the rest-of-week rebalance safe.")
+                .font(.system(size: 12, design: .rounded))
+                .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                showingTrainingProfile = true
+            } label: {
+                Text("Set up training profile")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.white)
+            .background(AppTheme.Colors.warmAmber)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
+        }
+        .padding(14)
+        .background(AppTheme.Colors.warmAmber.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium)
+                .stroke(AppTheme.Colors.warmAmber.opacity(0.24), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
     }
 
     private func decisionButton(
@@ -757,6 +1036,36 @@ private struct TrainingDecisionSheet: View {
                     .font(.system(size: 11, weight: .semibold))
             }
             .foregroundColor(emphasized ? .white : AppTheme.Colors.success)
+            .padding(14)
+            .background(emphasized ? AppTheme.Colors.success.opacity(0.82) : AppTheme.Colors.DarkMode.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func keepPlanButton(
+        title: String,
+        detail: String,
+        icon: String,
+        emphasized: Bool = false
+    ) -> some View {
+        Button { dismiss() } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    Text(detail)
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundColor(emphasized ? Color.white.opacity(0.74) : AppTheme.Colors.DarkMode.textTertiary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(emphasized ? .white : AppTheme.Colors.DarkMode.textSecondary)
             .padding(14)
             .background(emphasized ? AppTheme.Colors.success.opacity(0.82) : AppTheme.Colors.DarkMode.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))

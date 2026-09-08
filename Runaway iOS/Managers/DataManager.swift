@@ -28,7 +28,12 @@ class DataManager {
 
     // MARK: - Observable Properties (Forwarded from stores)
 
-    var activities: [Activity] = []
+    var activities: [Activity] = [] {
+        didSet {
+            guard activities != oldValue, let id = UserSession.shared.userId else { return }
+            Task { await TrainingProgressStore.shared.refresh(athleteID: id, force: true) }
+        }
+    }
     var athlete: Athlete?
     var stats: AthleteStats?
     var currentGoal: RunningGoal?
@@ -100,6 +105,7 @@ class DataManager {
     // MARK: - Data Loading Methods
 
     func loadAllData(for userId: Int) async {
+        TrainingProgressStore.shared.activate(athleteID: userId)
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadActivities(for: userId) }
             group.addTask { await self.loadAthlete(for: userId) }
@@ -563,6 +569,7 @@ class DataManager {
     // MARK: - Cache Management
 
     func clearCache() {
+        TrainingProgressStore.shared.reset()
         activityStore.clearCache()
         PerformanceCache.shared.clearAll()
     }

@@ -8,11 +8,40 @@ import MapKit
 import CoreLocation
 import UIKit
 
+enum ActivityDateLabel {
+    static func text(
+        for date: Date,
+        relativeTo now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        if calendar.isDate(date, inSameDayAs: now) {
+            let elapsed = now.timeIntervalSince(date)
+            if elapsed >= 0 && elapsed < 3600 {
+                return "\(Int(elapsed / 60))m ago"
+            }
+            return "Today"
+        }
+
+        let activityDay = calendar.startOfDay(for: date)
+        let currentDay = calendar.startOfDay(for: now)
+        if calendar.dateComponents([.day], from: activityDay, to: currentDay).day == 1 {
+            return "Yesterday"
+        }
+
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+}
+
 struct CardView: View {
     let activity: LocalActivity
     let onTap: (() -> Void)?
     let previousActivities: [LocalActivity]
     @State private var isPressed = false
+    @ObservedObject private var unitPreferences = UnitPreferences.shared
 
     private var activityColor: Color {
         AppTheme.Colors.activityColor(for: activity.type ?? "")
@@ -54,10 +83,7 @@ struct CardView: View {
                         Text(activity.name ?? "Activity")
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
-                            .lineLimit(1)
-                        if let qi = quickInsight() {
-                            TrendChip(percentage: qi.percentage)
-                        }
+                            .lineLimit(2)
                     }
 
                     if let statsLine = statsSubtext {
@@ -79,13 +105,13 @@ struct CardView: View {
 
                 // ── Distance (right) ───────────────────────────────────────
                 if let distance = activity.distance,
-                   let miles = distanceMiles(distance) {
+                   let displayDistance = displayDistance(distance) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(String(format: miles >= 10 ? "%.1f" : "%.2f", miles))
+                        Text(String(format: displayDistance >= 10 ? "%.1f" : "%.2f", displayDistance))
                             .font(.system(size: 17, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .monospacedDigit()
-                        Text(UnitFormatter.distanceUnitAbbreviation)
+                        Text(unitPreferences.distanceUnit.abbreviation)
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                     }
@@ -106,9 +132,9 @@ struct CardView: View {
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { isPressed = $0 }, perform: {})
     }
 
-    private func distanceMiles(_ meters: Double) -> Double? {
-        let miles = meters * AppConstants.Conversion.metersToMiles
-        return miles >= 0.1 ? miles : nil
+    private func displayDistance(_ meters: Double) -> Double? {
+        let value = meters / unitPreferences.distanceUnit.metersPerUnit
+        return value >= 0.1 ? value : nil
     }
 
     private var statsSubtext: String? {
@@ -116,19 +142,14 @@ struct CardView: View {
         if let time = activity.elapsed_time {
             parts.append(formatElapsed(seconds: time))
         }
-        if let distance = activity.distance, let time = activity.elapsed_time, distance >= 80 {
-            parts.append(calcPace(distance: distance, time: time) + "/" + UnitFormatter.distanceUnitAbbreviation)
+        if ProgressActivityKind(activity.type ?? "") == .run, let distance = activity.distance, let time = activity.elapsed_time, distance >= 80 {
+            parts.append(calcPace(distance: distance, time: time))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func relativeDateString(from date: Date) -> String {
-        let i = Date().timeIntervalSince(date)
-        if i < 3600 { return "\(Int(i / 60))m ago" }
-        if i < 86400 { return "Today" }
-        if i < 172800 { return "Yesterday" }
-        let f = DateFormatter(); f.dateFormat = "MMM d"
-        return f.string(from: date)
+        ActivityDateLabel.text(for: date)
     }
 
     private struct QuickInsightData { let percentage: Double }
@@ -153,7 +174,10 @@ struct CardView: View {
 
     private func calcPace(distance: Double, time: Double) -> String {
         guard distance > 0, time > 0 else { return "--:--" }
-        return UnitFormatter.formatPaceTime(minutesPerMile: (time / 60) / (distance * 0.000621371))
+        return UnitFormatter.formatPace(
+            secondsPerMeter: time / distance,
+            unit: unitPreferences.distanceUnit
+        )
     }
 
     private func formatElapsed(seconds: TimeInterval) -> String {

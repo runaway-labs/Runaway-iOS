@@ -585,6 +585,7 @@ extension Color {
 // MARK: - Readiness Banner (Color-coded, glanceable)
 
 struct ReadinessBanner: View {
+    var compact = false
     @StateObject private var readinessService = ReadinessService.shared
     @State private var showingDetail = false
 
@@ -595,11 +596,11 @@ struct ReadinessBanner: View {
                 ZStack {
                     Circle()
                         .stroke(Color.white.opacity(0.12), lineWidth: 5)
-                        .frame(width: 64, height: 64)
+                        .frame(width: compact ? 42 : 64, height: compact ? 42 : 64)
                     Circle()
                         .trim(from: 0, to: ringProgress)
                         .stroke(readinessColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                        .frame(width: 64, height: 64)
+                        .frame(width: compact ? 42 : 64, height: compact ? 42 : 64)
                         .rotationEffect(.degrees(-90))
                     if let score = readinessService.todaysReadiness?.score {
                         VStack(spacing: 0) {
@@ -626,7 +627,7 @@ struct ReadinessBanner: View {
                     Text(readinessHeadline)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
-                    Text(readinessSubtext)
+                    Text(compact ? "Tap for recovery details" : readinessSubtext)
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                 }
@@ -639,11 +640,11 @@ struct ReadinessBanner: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(readinessColor.opacity(0.08))
+            .background(compact ? Color.white.opacity(0.03) : readinessColor.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium + 2))
             .overlay(
                 RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium + 2)
-                    .stroke(readinessColor.opacity(0.18), lineWidth: 1)
+                    .stroke(compact ? Color.white.opacity(0.07) : readinessColor.opacity(0.18), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

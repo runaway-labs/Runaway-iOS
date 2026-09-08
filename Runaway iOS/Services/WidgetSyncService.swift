@@ -31,6 +31,45 @@ final class WidgetSyncService {
 
     // MARK: - Public Methods
 
+    func updateProgressSnapshot(_ snapshot: TrainingProgressSnapshot) {
+        guard let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier),
+              defaults.integer(forKey: TrainingProgressSnapshot.athleteKey) == snapshot.athleteID,
+              let data = try? JSONEncoder().encode(snapshot) else { return }
+        defaults.set(data, forKey: TrainingProgressSnapshot.cacheKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
+    }
+
+    func updateBecomingData(
+        snapshot: BecomingSnapshot,
+        workout: DailyWorkout?,
+        readinessScore: Int?,
+        weatherTitle: String?,
+        weatherDetail: String?
+    ) {
+        guard let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier) else { return }
+        defaults.set(snapshot.headline, forKey: "becoming_headline")
+        defaults.set(snapshot.detail, forKey: "becoming_detail")
+        defaults.set(workout?.title ?? "Today's training", forKey: "becoming_workout")
+        defaults.set(workout?.formattedDistance ?? "Ready when you are", forKey: "becoming_workout_detail")
+        defaults.set(String(describing: snapshot.recommendedChoice), forKey: "becoming_recommended_choice")
+        defaults.set(UnitPreferences.shared.distanceUnit.rawValue, forKey: "preferred_activity_distance_unit")
+        defaults.set(Date().timeIntervalSince1970, forKey: "becoming_updated_at")
+        if let readinessScore { defaults.set(readinessScore, forKey: "becoming_readiness") }
+        else { defaults.removeObject(forKey: "becoming_readiness") }
+        if let weatherTitle { defaults.set(weatherTitle, forKey: "becoming_weather_title") }
+        else { defaults.removeObject(forKey: "becoming_weather_title") }
+        if let weatherDetail { defaults.set(weatherDetail, forKey: "becoming_weather_detail") }
+        else { defaults.removeObject(forKey: "becoming_weather_detail") }
+        for path in snapshot.paths {
+            let choice = String(describing: path.choice)
+            defaults.set(path.title, forKey: "becoming_path_\(choice)_title")
+            defaults.set(path.effect, forKey: "becoming_path_\(choice)_effect")
+            defaults.set(path.weekEffect, forKey: "becoming_path_\(choice)_week")
+        }
+        WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "CommitmentWidget")
+    }
+
     /// Update training phase and race goal for widgets
     func updateTrainingPhaseData(context: TrainingPhaseContext, goal: RunningGoal?) {
         guard let userDefaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier) else {
@@ -186,6 +225,8 @@ final class WidgetSyncService {
                 userDefaults.set(yearlyStats.total_distance_miles, forKey: AppConstants.WidgetKeys.yearlyMiles)
                 userDefaults.set(monthlyStats.total_distance_miles, forKey: AppConstants.WidgetKeys.monthlyMiles)
                 userDefaults.set(yearlyStats.total_runs, forKey: AppConstants.WidgetKeys.totalRuns)
+                userDefaults.set(Calendar.current.component(.year, from: Date()), forKey: "widget_progress_year")
+                userDefaults.set(Calendar.current.component(.month, from: Date()), forKey: "widget_progress_month")
 
                 // Process weekly activities (current week only, not affected by pagination)
                 let weekStartDate = Date().startOfWeek()
@@ -249,9 +290,15 @@ final class WidgetSyncService {
         userDefaults.set(yearlyMiles, forKey: AppConstants.WidgetKeys.yearlyMiles)
         userDefaults.set(monthlyMiles, forKey: AppConstants.WidgetKeys.monthlyMiles)
         userDefaults.set(totalRuns, forKey: AppConstants.WidgetKeys.totalRuns)
+        userDefaults.set(Calendar.current.component(.year, from: Date()), forKey: "widget_progress_year")
+        userDefaults.set(Calendar.current.component(.month, from: Date()), forKey: "widget_progress_month")
     }
 
     nonisolated private static func storeWeeklyActivities(_ activities: [Activity], to userDefaults: UserDefaults) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekStart = calendar.date(byAdding: .day, value: 1 - calendar.component(.weekday, from: today), to: today) ?? today
+        userDefaults.set(weekStart.timeIntervalSince1970, forKey: "widget_progress_week_start")
         var weeklyArrays: [String: [String]] = [
             "Sunday": [], "Monday": [], "Tuesday": [],
             "Wednesday": [], "Thursday": [], "Friday": [], "Saturday": []
@@ -261,7 +308,6 @@ final class WidgetSyncService {
 
         for activity in activities {
             guard let dateInterval = activity.activity_date ?? activity.start_date,
-                  let distance = activity.distance,
                   let elapsedTime = activity.elapsed_time else {
                 continue
             }
@@ -272,7 +318,7 @@ final class WidgetSyncService {
             let raActivity = RAActivity(
                 day: String(dayOfWeek.prefix(2)),
                 type: displayType,
-                distance: distance * AppConstants.Conversion.metersToMiles,
+                distance: (activity.distance ?? 0) * AppConstants.Conversion.metersToMiles,
                 time: elapsedTime * AppConstants.Conversion.secondsToMinutes
             )
 

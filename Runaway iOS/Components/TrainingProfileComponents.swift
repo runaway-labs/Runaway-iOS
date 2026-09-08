@@ -94,6 +94,12 @@ final class TrainingProfileEditorViewModel: ObservableObject {
         retryScope != nil
     }
 
+    var currentWeekActionTitle: String {
+        (preservedRegenerationInput ?? currentPlan()) == nil
+            ? "Create This Week"
+            : "Rebalance This Week"
+    }
+
     var isEditorInteractionDisabled: Bool {
         isRegenerating
     }
@@ -229,17 +235,26 @@ final class TrainingProfileEditorViewModel: ObservableObject {
     }
 
     func regenerate(scope: PlanRegenerationScope) async {
+        await Task.yield()
         isPresentingRegenerationChoices = false
         isRegenerating = true
         errorMessage = nil
-        retryScope = scope
+        let regenerationInput = preservedRegenerationInput ?? currentPlan()
+        preservedRegenerationInput = regenerationInput
+        let generationScope: PlanRegenerationScope
+        if case .remainingCurrentWeek = scope, regenerationInput == nil {
+            generationScope = .initialCurrentWeek
+        } else {
+            generationScope = scope
+        }
+        retryScope = generationScope
         defer { isRegenerating = false }
 
         do {
             _ = try await generatePlan(
                 trainingProfileStore.profile,
-                scope,
-                preservedRegenerationInput
+                generationScope,
+                regenerationInput
             )
             retryScope = nil
             preservedRegenerationInput = nil

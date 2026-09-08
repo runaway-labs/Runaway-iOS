@@ -33,22 +33,17 @@ struct AthleteView: View {
     let stats: AthleteStats
     @Environment(DataManager.self) private var dataManager
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
-    @State private var personalBests: [PersonalBest] = []
+    @State private var personalBests: [SupportedPersonalBest] = []
     @State private var isLoadingPRs = false
+    @State private var prLoadError = false
+    @State private var selectedRecordActivity: LocalActivity?
+    @State private var showingRunningGoals = false
     @State private var mindsetProfile: MindsetProfile? = nil
     @State private var milestones: [RunnerIdentityMilestone] = []
     @State private var mindsetLoadError = false
     @State private var showingEditMindset = false
     @State private var showingTrainingPreferences = false
     @Environment(\.openURL) private var openURL
-
-    private var lifetimeMiles: Double { (stats.distance ?? 0) * 0.000621371 }
-    private var lifetimeRuns: Int { stats.count ?? 0 }
-    private var lifetimeHours: Int { Int((stats.elapsedTime ?? 0) / 3600) }
-
-    private func prTime(for distance: PRDistance) -> String? {
-        personalBests.first(where: { $0.distanceLabel == distance.label })?.formattedTime
-    }
 
     var body: some View {
         ZStack {
@@ -91,6 +86,8 @@ struct AthleteView: View {
                         }
                         Spacer()
                     }
+
+                    AthleteAchievementSummary(athleteID: athlete.id)
 
                     // ── MINDSET ────────────────────────────────────────────
                     VStack(alignment: .leading, spacing: 10) {
@@ -164,11 +161,11 @@ struct AthleteView: View {
                     }
 
                     // ── MILESTONES ─────────────────────────────────────────
-                    if !milestones.isEmpty {
+                    if !earnedMilestones.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             EyebrowLabel(text: "MILESTONES")
                             VStack(spacing: 0) {
-                                ForEach(Array(milestones.enumerated()), id: \.element.id) { index, milestone in
+                                ForEach(Array(earnedMilestones.enumerated()), id: \.element.id) { index, milestone in
                                     if index > 0 {
                                         Divider().background(Color.white.opacity(0.06))
                                     }
@@ -181,50 +178,15 @@ struct AthleteView: View {
                         }
                     }
 
-                    // ── LIFETIME ───────────────────────────────────────────
-                    VStack(alignment: .leading, spacing: 10) {
-                        EyebrowLabel(text: "LIFETIME")
-                        HStack(spacing: 0) {
-                            LifetimeStatTile(value: lifetimeMiles.formatted(.number.precision(.fractionLength(0))), label: "MILES")
-                            Rectangle().fill(Color.white.opacity(0.07)).frame(width: 1, height: 50)
-                            LifetimeStatTile(value: "\(lifetimeRuns)", label: "RUNS")
-                            Rectangle().fill(Color.white.opacity(0.07)).frame(width: 1, height: 50)
-                            LifetimeStatTile(value: "\(lifetimeHours)", label: "HOURS")
-                        }
-                        .background(AppTheme.Colors.DarkMode.cardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.07), lineWidth: 1))
-                    }
-
-                    // ── PERSONAL BESTS ─────────────────────────────────────
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            EyebrowLabel(text: "PERSONAL BESTS")
-                            if isLoadingPRs {
-                                Spacer()
-                                ProgressView().scaleEffect(0.7).tint(AppTheme.Colors.warmAmber)
-                            }
-                        }
-                        VStack(spacing: 0) {
-                            ForEach(Array(PRDistance.allCases.enumerated()), id: \.offset) { index, distance in
-                                if index > 0 {
-                                    Divider().background(Color.white.opacity(0.06))
-                                }
-                                PersonalBestRow(
-                                    distance: distance.displayName,
-                                    time: prTime(for: distance)
-                                )
-                            }
-                        }
-                        .background(AppTheme.Colors.DarkMode.cardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.07), lineWidth: 1))
-                    }
-
+                    PersonalBestCollection(records: personalBests, isLoading: isLoadingPRs, hasError: prLoadError,
+                        onRetry: { Task { await loadRecords() } }, onOpen: { selectedRecordActivity = $0 })
+                    
                     // ── ACCOUNT ────────────────────────────────────────────
                     VStack(alignment: .leading, spacing: 10) {
                         EyebrowLabel(text: "ACCOUNT")
                         VStack(spacing: 0) {
+                            AccountRow(icon: "target", title: "Running goals", subtitle: "Weekly and monthly distance", action: { showingRunningGoals = true })
+                            Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
                             AccountRow(icon: "figure.run", title: "Running Mindset", subtitle: mindsetProfile?.runnerIdentity ?? "Not set", action: { showingEditMindset = true })
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
                             AccountRow(icon: "bolt.fill", title: "Strava", subtitle: stravaSubtitle)
@@ -251,28 +213,29 @@ struct AthleteView: View {
                 .padding(20)
             }
         }
-        .task {
+        .task(id: athlete.id) {
+            personalBests = []
+            milestones = []
+            mindsetProfile = nil
+            mindsetLoadError = false
+            prLoadError = false
             guard let athleteId = athlete.id else { return }
-
-            isLoadingPRs = true
-            async let profileTask = RunnerMindsetService.fetchProfile(athleteId: athleteId)
-            async let milestonesTask = RunnerMindsetService.fetchMilestones(athleteId: athleteId)
-
-            let recomputed = try? await PersonalBestService.shared.recomputeAndSave(athleteId: athleteId)
-            if let prs = recomputed {
-                personalBests = prs
-            } else {
-                personalBests = (try? await PersonalBestService.shared.fetchPRs(athleteId: athleteId)) ?? []
-            }
-            isLoadingPRs = false
-
+            async let progress: Void = TrainingProgressStore.shared.refresh(athleteID: athleteId)
+            async let records: Void = loadRecords()
+            async let profile = RunnerMindsetService.fetchProfile(athleteId: athleteId)
+            async let earned = RunnerMindsetService.fetchMilestones(athleteId: athleteId)
             do {
-                mindsetProfile = try await profileTask
-            } catch {
-                mindsetLoadError = true
-            }
-            milestones = (try? await milestonesTask) ?? []
+                let loaded = try await profile
+                if !Task.isCancelled { mindsetProfile = loaded }
+            } catch { if !Task.isCancelled { mindsetLoadError = true } }
+            let loaded = (try? await earned) ?? []
+            if !Task.isCancelled { milestones = loaded }
+            _ = await (progress, records)
         }
+        .sheet(item: $selectedRecordActivity) { activity in
+            NavigationStack { ActivityDetailView(activity: activity) }
+        }
+        .sheet(isPresented: $showingRunningGoals) { GoalSettingsView() }
         .sheet(isPresented: $showingEditMindset) {
             if let athleteId = athlete.id {
                 EditRunnerMindsetView(
@@ -295,6 +258,27 @@ struct AthleteView: View {
         }
     }
 
+    private var earnedMilestones: [RunnerIdentityMilestone] {
+        Array(milestones.filter { $0.earned && $0.earnedAt != nil }
+            .sorted { ($0.earnedAt ?? .distantPast) > ($1.earnedAt ?? .distantPast) }.prefix(3))
+    }
+    
+    @MainActor
+    private func loadRecords() async {
+        guard let id = athlete.id else { return }
+        isLoadingPRs = true
+        prLoadError = false
+        do {
+            let records = try await PersonalBestService.shared.fetchSupportedPRs(athleteId: id)
+            guard !Task.isCancelled, dataManager.athlete?.id == id else { return }
+            personalBests = records
+        } catch {
+            guard !Task.isCancelled, dataManager.athlete?.id == id else { return }
+            prLoadError = true
+        }
+        isLoadingPRs = false
+    }
+    
     // MARK: - Computed strings
 
     private var trainingPreferencesSubtitle: String {

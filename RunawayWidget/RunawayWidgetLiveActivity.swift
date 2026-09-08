@@ -9,6 +9,30 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
+private enum LiveActivityUnits {
+    private static var isMetric: Bool {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        let raw = defaults?.string(forKey: "preferred_activity_distance_unit")
+            ?? defaults?.string(forKey: "preferred_distance_unit")
+            ?? "miles"
+        return raw.lowercased().contains("kilometer") || raw.lowercased() == "km"
+    }
+
+    static var distanceLabel: String { isMetric ? "km" : "mi" }
+    static var paceLabel: String { isMetric ? "/km" : "/mi" }
+
+    static func distance(_ meters: Double) -> String {
+        let value = isMetric ? meters / 1_000 : meters / 1_609.344
+        return String(format: "%.2f", value)
+    }
+
+    static func pace(_ secondsPerMile: Double) -> String {
+        guard secondsPerMile > 0 && secondsPerMile < 3_600 else { return "--:--" }
+        let secondsPerUnit = isMetric ? secondsPerMile / 1.609344 : secondsPerMile
+        return String(format: "%d:%02d", Int(secondsPerUnit) / 60, Int(secondsPerUnit) % 60)
+    }
+}
+
 // MARK: - Activity Attributes
 
 struct RunawayWidgetAttributes: ActivityAttributes {
@@ -39,7 +63,7 @@ struct RunawayWidgetLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 4) {
                         Image(systemName: activityIcon(for: context.attributes.activityType))
-                            .foregroundColor(.green)
+                            .foregroundColor(BecomingWidgetTheme.mint)
                         Text(formatDistance(context.state.distance))
                             .font(.title3)
                             .fontWeight(.bold)
@@ -103,7 +127,7 @@ struct RunawayWidgetLiveActivity: Widget {
                 // Compact leading - show distance
                 HStack(spacing: 2) {
                     Image(systemName: "figure.run")
-                        .foregroundColor(.green)
+                        .foregroundColor(BecomingWidgetTheme.mint)
                     Text(formatDistance(context.state.distance))
                         .font(.caption)
                         .fontWeight(.bold)
@@ -120,7 +144,7 @@ struct RunawayWidgetLiveActivity: Widget {
                     .foregroundColor(context.state.isPaused ? .orange : .green)
             }
             .widgetURL(URL(string: "runaway://activity"))
-            .keylineTint(.green)
+            .keylineTint(BecomingWidgetTheme.mint)
         }
     }
 
@@ -138,8 +162,7 @@ struct RunawayWidgetLiveActivity: Widget {
     }
 
     private func formatDistance(_ meters: Double) -> String {
-        let miles = meters / 1609.34
-        return String(format: "%.2f", miles)
+        return LiveActivityUnits.distance(meters)
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
@@ -161,10 +184,7 @@ struct RunawayWidgetLiveActivity: Widget {
     }
 
     private func formatPace(_ secondsPerMile: Double) -> String {
-        guard secondsPerMile > 0 && secondsPerMile < 3600 else { return "--:--" }
-        let minutes = Int(secondsPerMile) / 60
-        let seconds = Int(secondsPerMile) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        return LiveActivityUnits.pace(secondsPerMile)
     }
 }
 
@@ -179,7 +199,7 @@ struct LockScreenLiveActivityView: View {
             HStack {
                 Image(systemName: activityIcon)
                     .font(.title2)
-                    .foregroundColor(.green)
+                    .foregroundColor(BecomingWidgetTheme.mint)
 
                 Text(context.attributes.activityType)
                     .font(.headline)
@@ -202,13 +222,13 @@ struct LockScreenLiveActivityView: View {
                 } else {
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(.green)
+                            .fill(BecomingWidgetTheme.mint)
                             .frame(width: 8, height: 8)
                         Text("ACTIVE")
                     }
                     .font(.caption)
                     .fontWeight(.bold)
-                    .foregroundColor(.green)
+                    .foregroundColor(BecomingWidgetTheme.mint)
                 }
             }
 
@@ -217,9 +237,9 @@ struct LockScreenLiveActivityView: View {
                 // Distance
                 MetricColumn(
                     value: formatDistance(context.state.distance),
-                    unit: "mi",
+                    unit: LiveActivityUnits.distanceLabel,
                     label: "DISTANCE",
-                    color: .green
+                    color: BecomingWidgetTheme.mint
                 )
 
                 Spacer()
@@ -237,14 +257,14 @@ struct LockScreenLiveActivityView: View {
                 // Pace
                 MetricColumn(
                     value: formatPace(context.state.averagePace),
-                    unit: "/mi",
+                    unit: LiveActivityUnits.paceLabel,
                     label: "AVG PACE",
                     color: .orange
                 )
             }
         }
         .padding()
-        .activityBackgroundTint(Color.black.opacity(0.8))
+        .activityBackgroundTint(BecomingWidgetTheme.background)
         .activitySystemActionForegroundColor(.white)
     }
 
@@ -260,8 +280,7 @@ struct LockScreenLiveActivityView: View {
     }
 
     private func formatDistance(_ meters: Double) -> String {
-        let miles = meters / 1609.34
-        return String(format: "%.2f", miles)
+        return LiveActivityUnits.distance(meters)
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
@@ -277,10 +296,7 @@ struct LockScreenLiveActivityView: View {
     }
 
     private func formatPace(_ secondsPerMile: Double) -> String {
-        guard secondsPerMile > 0 && secondsPerMile < 3600 else { return "--:--" }
-        let minutes = Int(secondsPerMile) / 60
-        let seconds = Int(secondsPerMile) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        return LiveActivityUnits.pace(secondsPerMile)
     }
 }
 

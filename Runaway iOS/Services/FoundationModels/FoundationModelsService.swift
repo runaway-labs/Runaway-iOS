@@ -212,8 +212,6 @@ class FoundationModelsService: ObservableObject {
             return response.content
         } catch {
             failureCircuitBreaker.recordFailure()
-            isAvailable = false
-            availabilityState = .modelNotReady
             let wrappedError = FoundationModelsError.generationFailed(error)
             lastError = wrappedError
             #if DEBUG

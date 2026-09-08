@@ -1,322 +1,267 @@
-import WidgetKit
-import SwiftUI
-import Charts
 import AppIntents
+import SwiftUI
+import WidgetKit
 
-struct WidgetTheme {
-    static let background = Color(red: 0.031, green: 0.039, blue: 0.055)
-    static let accent = Color(red: 0.961, green: 0.620, blue: 0.043)
-    static let secondary = Color(white: 0.6)
+enum BecomingWidgetTheme {
+    static let background = Color(red: 0.02, green: 0.05, blue: 0.08)
+    static let surface = Color(red: 0.05, green: 0.11, blue: 0.15)
+    static let blue = Color(red: 0.20, green: 0.66, blue: 1)
+    static let mint = Color(red: 0.22, green: 0.86, blue: 0.65)
+    static let caution = Color(red: 1, green: 0.78, blue: 0.18)
+    static let secondary = Color.white.opacity(0.58)
 }
 
-struct Day: Identifiable {
-    var name: String
-    var type: String
-    var minutes: Double = 0
-    var miles: Double = 0
-    var id = UUID()
+struct BecomingWidgetPath: Identifiable {
+    let choice: WidgetBecomingChoice
+    let title: String
+    let effect: String
+    let weekEffect: String
+    let recommended: Bool
+    var id: String { choice.rawValue }
 }
 
-struct SimpleEntry: TimelineEntry {
+struct BecomingWidgetEntry: TimelineEntry {
     let date: Date
-    let miles: Double
-    let monthlyMiles: Double
-    let runs: Int
-    let days: [Day]
-    let selectedActivities: [ActivityTypeEntity]
+    let headline: String
+    let detail: String
+    let workout: String
+    let workoutDetail: String
+    let readiness: Int?
+    let recommendedChoice: WidgetBecomingChoice
+    let selectedChoice: WidgetBecomingChoice?
+    let weatherTitle: String?
+    let weatherDetail: String?
+    let paths: [BecomingWidgetPath]
+    let weeklyDistance: Double
     let weeklyGoal: Double
-    let monthlyGoal: Double
-    let todaysCommitmentType: String?
-    let todaysCommitmentFulfilled: Bool
+    let unit: String
+    let updatedAt: Date?
+    var progress: ProgressWidgetSnapshot = .preview
+
+    var recommendedPath: BecomingWidgetPath {
+        paths.first(where: { $0.choice == recommendedChoice }) ?? paths[0]
+    }
+    var isStale: Bool { updatedAt.map { Date().timeIntervalSince($0) > 14_400 } ?? true }
 }
 
-struct BarChart: View {
-    var days: [Day]
-    var selectedActivities: [ActivityTypeEntity]
+struct BecomingWidgetProvider: AppIntentTimelineProvider {
+    typealias Intent = ConfigurationAppIntent
+    typealias Entry = BecomingWidgetEntry
 
-    private var hasActivitiesThisWeek: Bool {
-        days.contains { $0.minutes > 0 }
+    func placeholder(in context: Context) -> BecomingWidgetEntry { sample }
+    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> BecomingWidgetEntry {
+        context.isPreview ? sample : read(selectedTypes: configuration.selectedActivities?.map(\.name))
+    }
+    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<BecomingWidgetEntry> {
+        let now = Date()
+        return Timeline(entries: [read(now, selectedTypes: configuration.selectedActivities?.map(\.name))], policy: .after(now.addingTimeInterval(1_800)))
     }
 
-    private func colorFromHex(_ hex: String) -> Color {
-        let hexString = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hexString).scanHexInt64(&int)
-        let r = Double((int >> 16) & 0xFF) / 255.0
-        let g = Double((int >> 8) & 0xFF) / 255.0
-        let b = Double(int & 0xFF) / 255.0
-        return Color(red: r, green: g, blue: b)
+    private func read(_ date: Date = Date(), selectedTypes: [String]? = nil) -> BecomingWidgetEntry {
+        let d = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        let unitRaw = d?.string(forKey: "preferred_activity_distance_unit") ?? d?.string(forKey: "preferred_distance_unit") ?? "miles"
+        let metric = unitRaw.lowercased().contains("kilometer") || unitRaw.lowercased() == "km"
+        let conversion = metric ? 1.609344 : 1
+        let recommended = WidgetBecomingChoice(rawValue: d?.string(forKey: "becoming_recommended_choice") ?? "planned") ?? .planned
+        let selected = WidgetBecomingChoice(rawValue: d?.string(forKey: "becoming_selected_choice") ?? "")
+        let paths = WidgetBecomingChoice.allCases.map { choice in
+            BecomingWidgetPath(
+                choice: choice,
+                title: d?.string(forKey: "becoming_path_\(choice.rawValue)_title") ?? fallbackTitle(choice),
+                effect: d?.string(forKey: "becoming_path_\(choice.rawValue)_effect") ?? fallbackEffect(choice),
+                weekEffect: d?.string(forKey: "becoming_path_\(choice.rawValue)_week") ?? "Your remaining week responds.",
+                recommended: choice == recommended
+            )
+        }
+        let stamp = d?.double(forKey: "becoming_updated_at") ?? 0
+        let progress = ProgressWidgetSnapshot.read(from: d, at: date, selectedTypes: selectedTypes)
+        return BecomingWidgetEntry(
+            date: date,
+            headline: d?.string(forKey: "becoming_headline") ?? "Build from today's choice",
+            detail: d?.string(forKey: "becoming_detail") ?? "Open Runaway to create today's adaptive plan.",
+            workout: d?.string(forKey: "becoming_workout") ?? "Today's training",
+            workoutDetail: d?.string(forKey: "becoming_workout_detail") ?? "Ready when you are",
+            readiness: d?.object(forKey: "becoming_readiness") as? Int,
+            recommendedChoice: recommended, selectedChoice: selected,
+            weatherTitle: d?.string(forKey: "becoming_weather_title"),
+            weatherDetail: d?.string(forKey: "becoming_weather_detail"), paths: paths,
+            weeklyDistance: progress.weeklyDistance,
+            weeklyGoal: max(1, (d?.double(forKey: "weekly_goal_miles") ?? 20) * conversion),
+            unit: metric ? "km" : "mi", updatedAt: stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil,
+            progress: progress
+        )
     }
 
-    var body: some View {
-        ZStack {
-            let colorMapping: [(String, Color)] = selectedActivities.map { ($0.name, colorFromHex($0.color)) }
-
-            Chart {
-                ForEach(days) { day in
-                    BarMark(
-                        x: .value("Day", day.name),
-                        y: .value("Minutes", day.minutes)
-                    )
-                    .foregroundStyle(by: .value("Type", day.type))
-                    .cornerRadius(2)
+    private func weeklyMiles(from defaults: UserDefaults?) -> Double {
+        struct StoredActivity: Decodable { let distance: Double }
+        let keys = ["sunArray", "monArray", "tueArray", "wedArray", "thuArray", "friArray", "satArray"]
+        return keys.reduce(0) { total, key in
+            total + (defaults?.stringArray(forKey: key) ?? []).reduce(0) { dayTotal, json in
+                guard let data = json.data(using: .utf8),
+                      let activity = try? JSONDecoder().decode(StoredActivity.self, from: data) else {
+                    return dayTotal
                 }
-            }
-            .chartForegroundStyleScale(domain: colorMapping.map { $0.0 }, range: colorMapping.map { $0.1 })
-            .chartXAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisValueLabel().foregroundStyle(WidgetTheme.secondary)
-                }
-            }
-            .chartYAxis {
-                AxisMarks(values: .automatic) { _ in
-                    AxisGridLine().foregroundStyle(Color.white.opacity(0.05))
-                }
-            }
-            .chartLegend(.hidden)
-            
-            if !hasActivitiesThisWeek {
-                Text("Twin is waiting for data...")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(WidgetTheme.accent.opacity(0.8))
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 8).fill(WidgetTheme.background))
+                return dayTotal + activity.distance
             }
         }
     }
-}
 
-struct MiniProgressView: View {
-    var current: Double
-    var goal: Double
-    var label: String
-    var color: Color
-    
-    var body: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.05), lineWidth: 4)
-                Circle()
-                    .trim(from: 0, to: max(0.01, min(current / max(1.0, goal), 1.0)))
-                    .stroke(color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                
-                VStack(spacing: 0) {
-                    Text(String(format: "%.0f", current))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
-                }
-            }
-            .frame(width: 44, height: 44)
-            
-            Text(label)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(WidgetTheme.secondary)
-                .tracking(0.5)
+    private func fallbackTitle(_ choice: WidgetBecomingChoice) -> String {
+        switch choice {
+        case .planned: return "Follow the plan"
+        case .easier: return "Ease the effort"
+        case .alternate: return "Change the stimulus"
+        case .recover: return "Protect recovery"
         }
     }
+    private func fallbackEffect(_ choice: WidgetBecomingChoice) -> String {
+        switch choice {
+        case .planned: return "Keep today's session intact."
+        case .easier: return "Reduce today's training load."
+        case .alternate: return "Use another profile activity."
+        case .recover: return "Move today's load into the week."
+        }
+    }
+    private var sample: BecomingWidgetEntry {
+        let paths = WidgetBecomingChoice.allCases.map {
+            BecomingWidgetPath(choice: $0, title: fallbackTitle($0), effect: fallbackEffect($0), weekEffect: "Protects tomorrow's quality session.", recommended: $0 == .easier)
+        }
+        return BecomingWidgetEntry(date: Date(), headline: "Keep the week moving", detail: "Useful work without forcing it.", workout: "Easy Run", workoutDetail: "28 min · conversational", readiness: 57, recommendedChoice: .easier, selectedChoice: nil, weatherTitle: "RunCast · Clear window", weatherDetail: "Dry · Light breeze", paths: paths, weeklyDistance: 8.1, weeklyGoal: 20, unit: "mi", updatedAt: Date())
+    }
 }
 
-struct RunawayWidgetEntryView : View {
-    var entry: SimpleEntry
-    @Environment(\.widgetFamily) var family
-    
-    var weeklyMileage: Double {
-        entry.days.reduce(0) { $0 + $1.miles }
-    }
+struct RunawayWidgetEntryView: View {
+    let entry: BecomingWidgetEntry
+    @Environment(\.widgetFamily) private var family
 
     var body: some View {
         switch family {
-        case .systemSmall:
-            smallView
-        case .systemMedium, .systemLarge:
-            largeView
-        default:
-            smallView
+        case .systemSmall: AccomplishmentWidgetView(progress: entry.progress, size: .small)
+        case .systemMedium: AccomplishmentWidgetView(progress: entry.progress, size: .medium)
+        case .systemLarge, .systemExtraLarge: AccomplishmentWidgetView(progress: entry.progress, size: .large)
+        case .accessoryCircular: circular
+        case .accessoryRectangular: rectangular
+        case .accessoryInline: inline
+        default: AccomplishmentWidgetView(progress: entry.progress, size: .small)
         }
     }
-    
-    private var smallView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // App name top
+
+    private var readinessColor: Color {
+        guard let value = entry.readiness else { return BecomingWidgetTheme.blue }
+        return value >= 70 ? BecomingWidgetTheme.mint : value >= 45 ? BecomingWidgetTheme.caution : .red
+    }
+    private var header: some View {
+        HStack {
+            Text("THE BECOMING LINE").font(.system(size: 9, weight: .black, design: .rounded)).tracking(1).foregroundStyle(BecomingWidgetTheme.blue).widgetAccentable()
+            Spacer()
+            if entry.isStale { Image(systemName: "arrow.clockwise").font(.caption2).foregroundStyle(BecomingWidgetTheme.secondary) }
+        }
+    }
+    private var small: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            header
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(entry.readiness.map(String.init) ?? "--").font(.system(size: 35, weight: .black, design: .rounded)).foregroundStyle(readinessColor)
+                Text("READY").font(.system(size: 8, weight: .bold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary)
+            }
+            Text(entry.workout).font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+            Text("Best path: \(entry.recommendedChoice.shortTitle.capitalized)").font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.mint).lineLimit(1)
+            Spacer(minLength: 0)
+            Button(intent: ChooseBecomingPathIntent(choice: entry.recommendedChoice)) {
+                Label("Choose", systemImage: entry.recommendedChoice.icon).font(.system(size: 11, weight: .bold, design: .rounded)).frame(maxWidth: .infinity, minHeight: 30)
+            }.buttonStyle(.plain).tint(BecomingWidgetTheme.mint)
+        }.padding(14)
+    }
+    private var medium: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
             HStack {
-                Text("RUNAWAY")
-                    .font(.system(size: 10, weight: .black))
-                    .italic()
-                    .foregroundColor(WidgetTheme.accent)
-                    .tracking(1.0)
-                Spacer()
-                Image(systemName: "figure.run")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(WidgetTheme.accent.opacity(0.6))
-            }
-            .padding(.bottom, 10)
-
-            // Hero number fills space
-            Spacer()
-            VStack(alignment: .leading, spacing: 3) {
-                Text(String(format: "%.1f", weeklyMileage))
-                    .font(.system(size: 46, weight: .black))
-                    .foregroundColor(.white)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                Text("MILES THIS WEEK")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(WidgetTheme.secondary)
-                    .tracking(1.2)
-            }
-            Spacer()
-
-            // Progress bar at bottom with goal
-            VStack(alignment: .leading, spacing: 4) {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 5)
-                        Capsule()
-                            .fill(WidgetTheme.accent)
-                            .frame(width: geo.size.width * min(weeklyMileage / max(1.0, entry.weeklyGoal), 1.0), height: 5)
-                    }
-                }
-                .frame(height: 5)
-                Text(String(format: "%.0f / %.0f mi goal", weeklyMileage, entry.weeklyGoal))
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(WidgetTheme.secondary)
-            }
-        }
-        .padding(16)
-    }
-
-    private var largeView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row
-            HStack(alignment: .firstTextBaseline) {
-                Text("RUNAWAY")
-                    .font(.system(size: 13, weight: .black))
-                    .italic()
-                    .foregroundColor(WidgetTheme.accent)
-                    .tracking(1.5)
-                Spacer()
-                Text(String(Calendar.current.component(.year, from: Date())))
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(WidgetTheme.secondary)
-            }
-            .padding(.bottom, 10)
-
-            // Chart label
-            Text("WEEK INTENSITY")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(WidgetTheme.secondary)
-                .tracking(1.4)
-                .padding(.bottom, 6)
-
-            // Chart expands to fill available space
-            BarChart(days: entry.days, selectedActivities: entry.selectedActivities)
-                .frame(maxHeight: .infinity)
-
-            // Divider + stats pinned to bottom
-            Rectangle()
-                .fill(Color.white.opacity(0.08))
-                .frame(height: 1)
-                .padding(.vertical, 12)
-
-            HStack(alignment: .center, spacing: 0) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(String(format: "%.0f", entry.miles))
-                        .font(.system(size: 56, weight: .black))
-                        .foregroundColor(WidgetTheme.accent)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                        .shadow(color: WidgetTheme.accent.opacity(0.35), radius: 8, x: 0, y: 0)
-                    Text("TOTAL MILES")
-                        .font(.system(size: 9, weight: .black))
-                        .foregroundColor(WidgetTheme.secondary)
-                        .tracking(1.5)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.headline).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                    Text(entry.workout).font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary).lineLimit(1)
                 }
                 Spacer()
-                HStack(spacing: 16) {
-                    MiniProgressView(current: weeklyMileage, goal: entry.weeklyGoal, label: "WEEKLY", color: WidgetTheme.accent)
-                    MiniProgressView(current: entry.monthlyMiles, goal: entry.monthlyGoal, label: "MONTHLY", color: Color(red: 0.2, green: 0.9, blue: 0.5))
+                Text(entry.readiness.map(String.init) ?? "--").font(.system(size: 25, weight: .black, design: .rounded)).foregroundStyle(readinessColor)
+            }
+            pathButtons
+            Text(entry.recommendedPath.weekEffect).font(.system(size: 9, weight: .medium, design: .rounded)).foregroundStyle(BecomingWidgetTheme.mint).lineLimit(1)
+        }.padding(14)
+    }
+    private var large: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            header
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entry.headline).font(.system(size: 22, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    Text(entry.detail).font(.system(size: 11, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary).lineLimit(2)
                 }
+                Spacer()
+                readinessGauge.frame(width: 54, height: 54)
+            }
+            if let weather = entry.weatherTitle {
+                Label(weather, systemImage: "cloud.sun.fill").font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.blue)
+            }
+            ForEach(entry.paths) { path in
+                Button(intent: ChooseBecomingPathIntent(choice: path.choice)) {
+                    HStack(spacing: 10) {
+                        Image(systemName: path.choice.icon).frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(path.title).font(.system(size: 13, weight: .bold, design: .rounded))
+                            Text(path.effect).font(.system(size: 9, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                        if path.recommended { Text("BEST").font(.system(size: 8, weight: .black, design: .rounded)).foregroundStyle(BecomingWidgetTheme.mint) }
+                        Image(systemName: entry.selectedChoice == path.choice ? "checkmark.circle.fill" : "chevron.right")
+                    }.foregroundStyle(.white).padding(.horizontal, 11).padding(.vertical, 8)
+                        .background(path.recommended ? BecomingWidgetTheme.mint.opacity(0.1) : BecomingWidgetTheme.surface.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                }.buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+            Text(String(format: "%.1f / %.0f %@ this week", entry.weeklyDistance, entry.weeklyGoal, entry.unit)).font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary)
+        }.padding(16)
+    }
+    private var pathButtons: some View {
+        HStack(spacing: 5) {
+            ForEach(entry.paths) { path in
+                Button(intent: ChooseBecomingPathIntent(choice: path.choice)) {
+                    VStack(spacing: 4) {
+                        Circle().fill(path.recommended ? BecomingWidgetTheme.mint : BecomingWidgetTheme.blue.opacity(0.4)).frame(width: path.recommended ? 10 : 7, height: path.recommended ? 10 : 7)
+                        Text(path.choice.shortTitle).font(.system(size: 7, weight: .bold, design: .rounded)).foregroundStyle(path.recommended ? .white : BecomingWidgetTheme.secondary)
+                    }.frame(maxWidth: .infinity, minHeight: 38).background(path.recommended ? BecomingWidgetTheme.mint.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                }.buttonStyle(.plain)
             }
         }
-        .padding(16)
     }
-}
-
-struct Provider: AppIntentTimelineProvider {
-    typealias Entry = SimpleEntry
-    typealias Intent = ConfigurationAppIntent
-
-    private var defaultActivities: [ActivityTypeEntity] {
-        [
-            ActivityTypeEntity(id: "run", name: "Run", color: "#F59E0B"),
-            ActivityTypeEntity(id: "walk", name: "Walk", color: "#66CC66"),
-            ActivityTypeEntity(id: "weight_training", name: "Weight Training", color: "#FFB300")
-        ]
+    private var readinessGauge: some View {
+        Gauge(value: Double(entry.readiness ?? 0), in: 0...100) { EmptyView() } currentValueLabel: { Text(entry.readiness.map(String.init) ?? "--").font(.system(size: 15, weight: .black, design: .rounded)) }
+            .gaugeStyle(.accessoryCircularCapacity).tint(readinessColor)
     }
-
-    func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), miles: 1242.5, monthlyMiles: 42.8, runs: 12, days: [], selectedActivities: defaultActivities, weeklyGoal: 20.0, monthlyGoal: 100.0, todaysCommitmentType: nil, todaysCommitmentFulfilled: false)
-    }
-
-    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
-        let activities = configuration.selectedActivities ?? defaultActivities
-        return SimpleEntry(date: Date(), miles: 1242.5, monthlyMiles: 42.8, runs: 12, days: [], selectedActivities: activities, weeklyGoal: 20.0, monthlyGoal: 100.0, todaysCommitmentType: nil, todaysCommitmentFulfilled: false)
-    }
-    
-    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
-        let activities = configuration.selectedActivities ?? defaultActivities
-        let ud = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
-        
-        // Rebuild the days array from per-day activity arrays stored in UserDefaults
-        struct RawActivity: Codable { var day: String; var type: String; var distance: Double; var time: Double }
-        
-        let dayKeys = [("Su", "sunArray"), ("Mo", "monArray"), ("Tu", "tueArray"),
-                       ("We", "wedArray"), ("Th", "thuArray"), ("Fr", "friArray"), ("Sa", "satArray")]
-        
-        var daysData: [Day] = dayKeys.map { Day(name: $0.0, type: "Run", minutes: 0, miles: 0) }
-        
-        for (index, (shortName, key)) in dayKeys.enumerated() {
-            guard let jsonStrings = ud?.stringArray(forKey: key) else { continue }
-            for jsonString in jsonStrings {
-                guard let data = jsonString.data(using: .utf8),
-                      let act = try? JSONDecoder().decode(RawActivity.self, from: data) else { continue }
-                daysData.append(Day(name: shortName, type: act.type, minutes: act.time, miles: act.distance))
+    private var circular: some View { readinessGauge.widgetAccentable() }
+    private var rectangular: some View {
+        HStack(spacing: 8) {
+            Image(systemName: entry.recommendedChoice.icon).widgetAccentable()
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.workout).font(.headline).lineLimit(1)
+                Text("\(entry.readiness.map(String.init) ?? "--") ready · \(entry.recommendedChoice.shortTitle.capitalized)").font(.caption2).lineLimit(1)
             }
         }
-        
-        let entry = SimpleEntry(
-            date: Date(),
-            miles: ud?.double(forKey: "miles") ?? 0,
-            monthlyMiles: ud?.double(forKey: "monthlyMiles") ?? 0,
-            runs: ud?.integer(forKey: "runs") ?? 0,
-            days: daysData,
-            selectedActivities: activities,
-            weeklyGoal: max(1, ud?.double(forKey: "weekly_goal_miles") ?? 20),
-            monthlyGoal: max(1, ud?.double(forKey: "monthly_goal_miles") ?? 100),
-            todaysCommitmentType: ud?.string(forKey: "todays_commitment_type"),
-            todaysCommitmentFulfilled: ud?.bool(forKey: "todays_commitment_fulfilled") ?? false
-        )
-        
-        return Timeline(entries: [entry], policy: .atEnd)
     }
+    private var inline: some View { Label("\(entry.workout) · \(entry.readiness.map(String.init) ?? "--") ready", systemImage: entry.recommendedChoice.icon) }
 }
 
 struct RunawayWidget: Widget {
-    let kind: String = "RunawayWidget"
-    
+    let kind = "RunawayWidget"
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: Provider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: BecomingWidgetProvider()) { entry in
             RunawayWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    WidgetTheme.background
+                    LinearGradient(colors: [ProgressWidgetPalette.ink, Color(red: 0.055, green: 0.105, blue: 0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
+                .widgetURL(URL(string: "runaway://today"))
         }
-        .configurationDisplayName("Runaway Intelligence")
-        .description("Tactical training insights on your home screen.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .configurationDisplayName("Runaway Progress")
+        .description("See the distance you've earned, your activity this week, and your goals coming closer.")
+        .contentMarginsDisabled()
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

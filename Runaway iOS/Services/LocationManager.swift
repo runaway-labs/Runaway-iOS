@@ -9,12 +9,25 @@ import Foundation
 import CoreLocation
 import SwiftUI
 
+enum WeatherLocationDisplayPolicy {
+    static func label(
+        county: String?,
+        state: String?,
+        cityStateFallback: String
+    ) -> String {
+        guard let county, !county.isEmpty else { return cityStateFallback }
+        guard let state, !state.isEmpty else { return county }
+        return "\(county), \(state)"
+    }
+}
+
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = LocationManager()
     
     private let locationManager = CLLocationManager()
     @Published var location: CLLocation?
     @Published var locationString: String = ""
+    @Published private(set) var weatherLocationString: String = ""
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     
     // Throttling properties to prevent excessive geocoding
@@ -145,8 +158,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     let city = placemark.locality ?? "Unknown"
                     let state = placemark.administrativeArea ?? ""
                     let locationString = "\(city), \(state)"
+                    let weatherLocationString = WeatherLocationDisplayPolicy.label(
+                        county: placemark.subAdministrativeArea,
+                        state: placemark.administrativeArea,
+                        cityStateFallback: locationString
+                    )
                     
                     self?.locationString = locationString
+                    self?.weatherLocationString = weatherLocationString
                     
                     // Save to shared UserDefaults for widget access
                     if let userDefaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios") {

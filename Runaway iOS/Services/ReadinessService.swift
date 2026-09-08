@@ -293,7 +293,7 @@ class ReadinessService: ObservableObject {
                 userId: athleteId,
                 limit: 60
             )
-            let runningActivities = activities.filter {
+            let trainingActivities = activities.filter {
                 Self.isReadinessActivity(activityType: $0.type)
             }
 
@@ -301,7 +301,7 @@ class ReadinessService: ObservableObject {
 
             // Calculate acute load (last 7 days)
             let sevenDaysAgo = today.timeIntervalSince1970 - (7 * 24 * 60 * 60)
-            let acuteActivities = runningActivities.filter {
+            let acuteActivities = trainingActivities.filter {
                 guard let date = $0.activity_date else { return false }
                 return date >= sevenDaysAgo
             }
@@ -311,7 +311,7 @@ class ReadinessService: ObservableObject {
 
             // Calculate chronic load (8-28 days ago)
             let twentyEightDaysAgo = today.timeIntervalSince1970 - (28 * 24 * 60 * 60)
-            let chronicActivities = runningActivities.filter {
+            let chronicActivities = trainingActivities.filter {
                 guard let date = $0.activity_date else { return false }
                 return date >= twentyEightDaysAgo && date < sevenDaysAgo
             }
@@ -361,7 +361,23 @@ class ReadinessService: ObservableObject {
     }
 
     nonisolated static func isReadinessActivity(activityType: String?) -> Bool {
-        AppConstants.ActivityTypes.isRunning(activityType)
+        guard let activityType else { return false }
+        let normalized = activityType
+            .lowercased()
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+
+        let wholeBodyActivityMarkers = [
+            "run", "jog", "trail",
+            "ride", "bike", "cycling", "cycle",
+            "swim",
+            "strength", "weight", "crossfit", "functional training",
+            "walk", "hike", "hiking",
+            "mobility", "yoga", "pilates", "flexibility",
+            "row", "elliptical", "stair", "cardio", "hiit"
+        ]
+
+        return wholeBodyActivityMarkers.contains { normalized.contains($0) }
     }
 
     private func calculateActivityLoad(_ activity: Activity) -> Double {
@@ -369,10 +385,11 @@ class ReadinessService: ObservableObject {
         let elapsedTime = activity.elapsed_time ?? 0
         let durationHours = elapsedTime / 3600.0
 
-        // Intensity based on pace if running
+        // Pace is meaningful for running; other supported activities use a
+        // conservative duration-based load until richer HealthKit effort is available.
         let intensityFactor: Double
         let avgSpeed = activity.average_speed ?? 0
-        if avgSpeed > 0 {
+        if AppConstants.ActivityTypes.isRunning(activity.type), avgSpeed > 0 {
             // Faster pace = higher intensity
             let paceMinPerMile = (1609.34 / avgSpeed) / 60.0
             if paceMinPerMile < 7 {

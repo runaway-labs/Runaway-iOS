@@ -1,259 +1,47 @@
-//
-//  CommitmentWidget.swift
-//  RunawayWidget
-//
-//  Standalone widget for viewing and setting today's daily commitment.
-//  Supports small and medium sizes.
-//
-
-import WidgetKit
 import SwiftUI
-
-// MARK: - Entry
-
-struct CommitmentEntry: TimelineEntry {
-    let date: Date
-    let commitmentType: String?
-    let isFulfilled: Bool
-}
-
-// MARK: - Provider
-
-struct CommitmentProvider: TimelineProvider {
-    func placeholder(in context: Context) -> CommitmentEntry {
-        CommitmentEntry(date: Date(), commitmentType: nil, isFulfilled: false)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (CommitmentEntry) -> Void) {
-        completion(readEntry())
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<CommitmentEntry>) -> Void) {
-        let entry = readEntry()
-        let nextHour = Calendar.current.safeDate(byAdding: .hour, value: 1, to: Date())
-        completion(Timeline(entries: [entry], policy: .after(nextHour)))
-    }
-
-    private func readEntry() -> CommitmentEntry {
-        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
-        let type = defaults?.string(forKey: "todays_commitment_type")
-        let fulfilled = defaults?.bool(forKey: "todays_commitment_fulfilled") ?? false
-        return CommitmentEntry(date: Date(), commitmentType: type, isFulfilled: fulfilled)
-    }
-}
-
-// MARK: - Activity Color
-
-private extension CommitmentActivityAppEnum {
-    var color: Color {
-        switch self {
-        case .run:     return Color(red: 0.961, green: 0.620, blue: 0.043)
-        case .walk:    return Color(red: 0.35, green: 0.8, blue: 0.45)
-        case .workout: return Color(red: 1.0, green: 0.6, blue: 0.2)
-        case .yoga:    return Color(red: 0.75, green: 0.5, blue: 1.0)
-        }
-    }
-
-    static func from(_ rawValue: String) -> CommitmentActivityAppEnum? {
-        CommitmentActivityAppEnum.allCases.first { $0.rawValue.lowercased() == rawValue.lowercased() }
-    }
-}
-
-extension CommitmentActivityAppEnum: CaseIterable {
-    public static var allCases: [CommitmentActivityAppEnum] { [.run, .walk, .workout, .yoga] }
-}
-
-// MARK: - Entry View
+import WidgetKit
 
 struct CommitmentWidgetEntryView: View {
-    let entry: CommitmentEntry
-    @Environment(\.widgetFamily) var family
-
+    let entry: BecomingWidgetEntry
+    @Environment(\.widgetFamily) private var family
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
+        VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Text("COMMIT TODAY")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.35))
-                    .tracking(0.8)
+                Text("CHOOSE YOUR MOVE").font(.system(size: 9, weight: .black, design: .rounded)).tracking(1).foregroundStyle(BecomingWidgetTheme.blue).widgetAccentable()
                 Spacer()
-                Text("Runaway")
-                    .font(.system(size: 16, weight: .heavy))
-                    .italic()
-                    .foregroundColor(Color(red: 0.961, green: 0.620, blue: 0.043))
+                Text(entry.readiness.map { "\($0) READY" } ?? "CALIBRATING").font(.system(size: 8, weight: .bold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary)
             }
-            .padding(.bottom, 10)
-
-            if let type = entry.commitmentType {
-                CommitmentStatusView(type: type, isFulfilled: entry.isFulfilled)
+            if family == .systemSmall {
+                Text(entry.recommendedPath.title).font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(2)
+                Text(entry.recommendedPath.weekEffect).font(.system(size: 10, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary).lineLimit(2)
+                Spacer(minLength: 0)
+                Button(intent: ChooseBecomingPathIntent(choice: entry.recommendedChoice)) {
+                    Label("Choose best path", systemImage: entry.recommendedChoice.icon).font(.system(size: 10, weight: .bold, design: .rounded)).frame(maxWidth: .infinity, minHeight: 31)
+                }.buttonStyle(.plain).tint(BecomingWidgetTheme.mint)
             } else {
-                CommitmentPickerView(family: family)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(14)
-    }
-}
-
-// MARK: - Status View (commitment already set)
-
-private struct CommitmentStatusView: View {
-    let type: String
-    let isFulfilled: Bool
-
-    private var matched: CommitmentActivityAppEnum? {
-        CommitmentActivityAppEnum.from(type)
-    }
-
-    private var accentColor: Color {
-        matched?.color ?? .white
-    }
-
-    private var iconName: String {
-        matched?.iconName ?? "checkmark.circle"
-    }
-
-    // Contextual rec line based on activity + fulfilled state
-    private var recLine: String {
-        if isFulfilled {
-            switch matched {
-            case .run:     return "Nice. Recovery run tomorrow."
-            case .walk:    return "Consistent. That's the game."
-            case .workout: return "Strength done. Respect."
-            case .yoga:    return "Mobile athlete. Keep it."
-            case .none:    return "Today's box is checked."
-            }
-        } else {
-            let hour = Calendar.current.component(.hour, from: Date())
-            switch matched {
-            case .run:
-                return hour < 10 ? "Morning miles hit different." : hour < 15 ? "Lunch run window is open." : "Evening run before dark."
-            case .walk:
-                return "Even 20 mins moves the needle."
-            case .workout:
-                return hour < 12 ? "Early session = early done." : "Get it in before dinner."
-            case .yoga:
-                return "10 minutes counts. Start there."
-            case .none:
-                return "Set your commitment for today."
-            }
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: iconName)
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundColor(isFulfilled ? .green : accentColor)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(type)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    Text(recLine)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(isFulfilled ? .green.opacity(0.8) : .white.opacity(0.5))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
-
-                Spacer()
-
-                Image(systemName: isFulfilled ? "checkmark.circle.fill" : "circle.dashed")
-                    .font(.system(size: 22))
-                    .foregroundColor(isFulfilled ? .green : .white.opacity(0.2))
-            }
-        }
-    }
-}
-
-// MARK: - Picker View (no commitment set)
-
-private struct CommitmentPickerView: View {
-    let family: WidgetFamily
-
-    var body: some View {
-        if family == .systemSmall {
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 4
-            ) {
-                ForEach(CommitmentActivityAppEnum.allCases, id: \.rawValue) { activity in
-                    CommitmentButton(activity: activity, compact: true)
+                Text("One choice now. The rest of the week responds.").font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white)
+                HStack(spacing: 7) {
+                    ForEach(entry.paths) { path in
+                        Button(intent: ChooseBecomingPathIntent(choice: path.choice)) {
+                            VStack(spacing: 5) { Image(systemName: path.choice.icon); Text(path.choice.shortTitle).font(.system(size: 7, weight: .black, design: .rounded)) }
+                                .foregroundStyle(path.recommended ? BecomingWidgetTheme.mint : .white).frame(maxWidth: .infinity, minHeight: 48)
+                                .background(path.recommended ? BecomingWidgetTheme.mint.opacity(0.12) : BecomingWidgetTheme.surface, in: RoundedRectangle(cornerRadius: 11))
+                        }.buttonStyle(.plain)
+                    }
                 }
             }
-        } else {
-            HStack(spacing: 0) {
-                ForEach(CommitmentActivityAppEnum.allCases, id: \.rawValue) { activity in
-                    CommitmentButton(activity: activity, compact: false)
-                }
-            }
-        }
+        }.padding(14)
     }
 }
-
-// MARK: - Individual Commitment Button
-
-private struct CommitmentButton: View {
-    let activity: CommitmentActivityAppEnum
-    let compact: Bool
-
-    var body: some View {
-        Button(intent: SetDailyCommitmentIntent(activityType: activity)) {
-            VStack(spacing: compact ? 4 : 6) {
-                Image(systemName: activity.iconName)
-                    .font(.system(size: compact ? 24 : 28, weight: .medium))
-                    .foregroundColor(activity.color)
-                Text(activity.displayName)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.55))
-            }
-            .frame(maxWidth: .infinity, minHeight: compact ? 52 : 60)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Widget
 
 struct CommitmentWidget: Widget {
-    let kind: String = "CommitmentWidget"
-
+    let kind = "CommitmentWidget"
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CommitmentProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                CommitmentWidgetEntryView(entry: entry)
-                    .containerBackground(for: .widget) {
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.031, green: 0.039, blue: 0.055),
-                                Color(red: 0.047, green: 0.059, blue: 0.078)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    }
-            } else {
-                CommitmentWidgetEntryView(entry: entry)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(red: 0.031, green: 0.039, blue: 0.055))
-            }
+        AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: BecomingWidgetProvider()) { entry in
+            CommitmentWidgetEntryView(entry: entry).containerBackground(for: .widget) { LinearGradient(colors: [BecomingWidgetTheme.background, BecomingWidgetTheme.surface], startPoint: .top, endPoint: .bottomTrailing) }
         }
-        .configurationDisplayName("Daily Commitment")
-        .description("Set and track your daily movement commitment.")
+        .configurationDisplayName("Choose Your Move")
+        .description("Make today's training decision without hunting through the app.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
-}
-
-// MARK: - Preview
-
-#Preview(as: .systemMedium) {
-    CommitmentWidget()
-} timeline: {
-    CommitmentEntry(date: .now, commitmentType: nil, isFulfilled: false)
-    CommitmentEntry(date: .now, commitmentType: "Run", isFulfilled: false)
-    CommitmentEntry(date: .now, commitmentType: "Run", isFulfilled: true)
 }

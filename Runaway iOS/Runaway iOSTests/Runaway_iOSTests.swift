@@ -11,6 +11,35 @@ import Testing
 
 struct Runaway_iOSTests {
 
+    @Test func activityDatesUseCalendarDaysInsteadOfRollingTwentyFourHours() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Chicago"))
+        let now = try #require(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 3, hour: 13, minute: 18
+        )))
+        let priorCalendarDay = try #require(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 2, hour: 14, minute: 8
+        )))
+
+        #expect(
+            ActivityDateLabel.text(
+                for: priorCalendarDay,
+                relativeTo: now,
+                calendar: calendar
+            ) == "Yesterday"
+        )
+    }
+
+    @Test func activityMetricsUseOneExplicitDisplayUnit() {
+        let meters = 3.0 / AppConstants.Conversion.metersToMiles
+        let elapsedSeconds = 27.0 * 60.0
+
+        #expect(UnitFormatter.formatDistance(meters, unit: .miles, decimals: 2) == "3.00mi")
+        #expect(UnitFormatter.formatDistance(meters, unit: .kilometers, decimals: 2) == "4.83km")
+        #expect(UnitFormatter.formatPace(secondsPerMeter: elapsedSeconds / meters, unit: .miles) == "9:00/mi")
+        #expect(UnitFormatter.formatPace(secondsPerMeter: elapsedSeconds / meters, unit: .kilometers) == "5:36/km")
+    }
+
     @Test func primaryTabsFollowTheRunnerJourney() {
         #expect(RunawayTab.allCases.map(\.title) == ["Today", "Activities", "Plan", "You"])
         #expect(RunawayTab.today.systemImage == "sun.max.fill")
@@ -239,9 +268,62 @@ struct Runaway_iOSTests {
         #expect(ReadinessService.normalizedScore(weightedScore: -10, availableWeight: 1) == 0)
     }
 
-    @Test func readinessIncludesRunsAndExcludesOtherActivities() {
+    @Test func readinessIncludesWholeBodyTrainingAndExcludesUnknownActivities() {
         #expect(ReadinessService.isReadinessActivity(activityType: "Run"))
-        #expect(!ReadinessService.isReadinessActivity(activityType: "Ride"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Ride"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Weight Training"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Swim"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Hike"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Walking"))
+        #expect(ReadinessService.isReadinessActivity(activityType: "Mobility"))
+        #expect(!ReadinessService.isReadinessActivity(activityType: "Meditation"))
+        #expect(!ReadinessService.isReadinessActivity(activityType: nil))
+    }
+
+    @Test func becomingEngineMakesRecoveryTheSafeDefaultWhenReadinessIsLow() throws {
+        let snapshot = BecomingEngine.simulate(
+            readinessScore: 34,
+            plannedTitle: "Threshold Intervals",
+            plannedDemand: .high,
+            alternativeTitles: ["Mobility", "Walking"],
+            remainingSessionCount: 4
+        )
+
+        #expect(snapshot.recommendedChoice == .recover)
+        #expect(snapshot.headline == "Protect tomorrow's capacity")
+        #expect(snapshot.paths.count == 3)
+        #expect(try #require(snapshot.paths.first(where: { $0.choice == .recover })).isRecommended)
+    }
+
+    @Test func becomingEnginePreservesThePlanWhenCapacitySupportsIt() throws {
+        let snapshot = BecomingEngine.simulate(
+            readinessScore: 82,
+            plannedTitle: "Aerobic Progression",
+            plannedDemand: .moderate,
+            alternativeTitles: ["Upper Body", "Cycling"],
+            remainingSessionCount: 3
+        )
+
+        #expect(snapshot.recommendedChoice == .planned)
+        #expect(snapshot.headline == "Build from today's choice")
+        let planned = try #require(snapshot.paths.first(where: { $0.choice == .planned }))
+        #expect(planned.title == "Aerobic Progression")
+        #expect(planned.weekEffect == "Keeps 3 future sessions on their current path.")
+    }
+
+    @Test func becomingEngineOffersAProfileAlternativeWithoutClaimingItIsEquivalent() throws {
+        let snapshot = BecomingEngine.simulate(
+            readinessScore: 61,
+            plannedTitle: "Tempo Run",
+            plannedDemand: .high,
+            alternativeTitles: ["Upper Body", "Swimming"],
+            remainingSessionCount: 5
+        )
+
+        #expect(snapshot.recommendedChoice == .easier)
+        let alternate = try #require(snapshot.paths.first(where: { $0.choice == .alternate }))
+        #expect(alternate.title == "Upper Body")
+        #expect(alternate.weekEffect == "Rebalances 5 future sessions after you choose.")
     }
 
     @Test func raceDateRoundTripsWithoutChangingCalendarDay() throws {
@@ -255,4 +337,33 @@ struct Runaway_iOSTests {
         // Write your test here and use APIs like `#expect(...)` to check expected conditions.
     }
 
+}
+
+extension Runaway_iOSTests {
+    @Test func projectedKilometerIsNotAnObservedMileRecord() {
+        #expect(!PersonalRecordEvidencePolicy.supports(targetMeters: 1609.34, timeSeconds: 483,
+            kind: .run, flagged: false, activityMeters: 5000, activitySeconds: 1800,
+            splits: [RecordedEffortSplit(distance: 1000, elapsed_time: 300)]))
+    }
+
+    @Test func recordEvidenceRequiresRunningAndExactContiguousDistance() {
+        let splits = (0..<5).map { _ in RecordedEffortSplit(distance: 1000, elapsed_time: 300) }
+        #expect(PersonalRecordEvidencePolicy.supports(targetMeters: 5000, timeSeconds: 1500,
+            kind: .run, flagged: false, activityMeters: 8000, activitySeconds: 2500, splits: splits))
+        #expect(!PersonalRecordEvidencePolicy.supports(targetMeters: 5000, timeSeconds: 1500,
+            kind: .bike, flagged: false, activityMeters: 5000, activitySeconds: 1500, splits: splits))
+        #expect(!PersonalRecordEvidencePolicy.supports(targetMeters: 21097.5, timeSeconds: 6300,
+            kind: .run, flagged: false, activityMeters: 21000, activitySeconds: 6300,
+            splits: (0..<21).map { _ in RecordedEffortSplit(distance: 1000, elapsed_time: 300) }))
+        #expect(!PersonalRecordEvidencePolicy.supports(targetMeters: 5000, timeSeconds: 1500,
+            kind: .run, flagged: true, activityMeters: 5000, activitySeconds: 1500, splits: splits))
+    }
+
+    @Test func invalidSplitCannotBeBridgedIntoARecord() {
+        let splits = [RecordedEffortSplit(distance: 1000, elapsed_time: 300),
+                      RecordedEffortSplit(distance: nil, elapsed_time: nil),
+                      RecordedEffortSplit(distance: 1000, elapsed_time: 300)]
+        #expect(!PersonalRecordEvidencePolicy.supports(targetMeters: 2000, timeSeconds: 600,
+            kind: .run, flagged: false, activityMeters: 8000, activitySeconds: 3000, splits: splits))
+    }
 }

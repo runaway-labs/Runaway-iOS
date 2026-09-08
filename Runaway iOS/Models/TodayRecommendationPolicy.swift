@@ -236,6 +236,7 @@ enum TodayRecommendationContextBuilder {
 enum TodayWorkoutAdjustment: Equatable {
     case recoveryDay
     case easierWorkout
+    case chosenWorkout(WorkoutType)
     case keepPlan
 }
 
@@ -248,6 +249,56 @@ struct TodayWorkoutAdjustmentResult {
 }
 
 enum TodayRecommendationPolicy {
+    typealias RemainingWeekRegenerator = (
+        WeeklyTrainingPlan,
+        TrainingProfile
+    ) async throws -> WeeklyTrainingPlan
+
+    static func canChooseTodaysTraining(
+        plannedWorkout: DailyWorkout?,
+        hasCompletedActivity: Bool
+    ) -> Bool {
+        plannedWorkout != nil && !hasCompletedActivity
+    }
+
+    static func workoutAlternatives(
+        profile: TrainingProfile,
+        readinessScore: Int?
+    ) -> [WorkoutType] {
+        let score = readinessScore ?? 100
+        let ordered = profile.activities
+            .filter { $0.sessionsPerWeek > 0 }
+            .sorted {
+                let lhs = rolePriority($0.role)
+                let rhs = rolePriority($1.role)
+                return lhs == rhs ? $0.activity.rawValue < $1.activity.rawValue : lhs < rhs
+            }
+            .map { preference -> WorkoutType in
+                switch preference.activity {
+                case .running: return score < 70 ? .recoveryRun : .easyRun
+                case .strength: return .upperBody
+                case .cycling: return .cycling
+                case .swimming: return .swimming
+                case .walking: return .walking
+                case .hiking: return .hiking
+                case .mobility: return .stretchMobility
+                }
+            }
+
+        let readinessSafe: [WorkoutType]
+        if score < 50 {
+            readinessSafe = ordered.filter { $0.isRecoveryCompatible }
+        } else if score < 70 {
+            readinessSafe = ordered.filter {
+                !$0.isHighIntensity
+                    && (!$0.isLowerBodyDemanding || $0.isRecoveryCompatible)
+            }
+        } else {
+            readinessSafe = ordered
+        }
+        return readinessSafe.uniqued()
+    }
+
     static func recommendation(readinessScore: Int?) -> TodayRecommendation {
         guard let readinessScore else {
             return TodayRecommendation(
@@ -296,6 +347,20 @@ enum TodayRecommendationPolicy {
     ) -> TodayRecommendation {
         let readinessRecommendation = recommendation(readinessScore: readinessScore)
         let adjustment = adjustment(for: readinessRecommendation.directive)
+
+        if let plannedWorkout, isUserSelectedToday(plannedWorkout) {
+            return TodayRecommendation(
+                directive: .proceed,
+                status: "Your Choice",
+                title: plannedWorkout.title,
+                detail: "You chose this session for today. Future workouts were adapted around it.",
+                systemImage: plannedWorkout.workoutType.icon,
+                workoutType: plannedWorkout.workoutType,
+                reason: "Your selection is locked for today.",
+                schedulingReason: .requiredPrimary,
+                adjustment: .keepPlan
+            )
+        }
 
         if let plannedWorkout,
            readinessRecommendation.directive == .proceed,
@@ -395,6 +460,11 @@ enum TodayRecommendationPolicy {
         return preference.sessionsPerWeek > 0
     }
 
+    private static func isUserSelectedToday(_ workout: DailyWorkout) -> Bool {
+        workout.description.hasPrefix("Adjusted for today's readiness")
+            || workout.description.hasPrefix("Chosen for today")
+    }
+
     private static func placementReason(for reason: SchedulingReason) -> String? {
         switch reason {
         case .requiredPrimary:
@@ -425,16 +495,49 @@ enum TodayRecommendationPolicy {
         guard adjustment != .keepPlan else { return nil }
 
         let calendar = Calendar.current
-        guard let workoutIndex = plan.workouts.firstIndex(where: {
+        var workouts = plan.workouts
+        let existingWorkoutIndex = workouts.firstIndex(where: {
             calendar.isDate($0.date, inSameDayAs: date)
-        }) else { return nil }
-
-        let original = plan.workouts[workoutIndex]
-        guard original.workoutType != .rest else { return nil }
+        })
+        let workoutIndex: Int
+        let original: DailyWorkout
+        if let existingWorkoutIndex {
+            workoutIndex = existingWorkoutIndex
+            original = workouts[existingWorkoutIndex]
+        } else {
+            let generatedType: WorkoutType
+            switch adjustment {
+            case .recoveryDay:
+                generatedType = .easyRun
+            case .easierWorkout:
+                generatedType = .easyRun
+            case .chosenWorkout(let workoutType):
+                generatedType = workoutType
+            case .keepPlan:
+                return nil
+            }
+            original = DailyWorkout(
+                id: "today-\(Int(calendar.startOfDay(for: date).timeIntervalSince1970))",
+                date: calendar.startOfDay(for: date),
+                dayOfWeek: DayOfWeek.from(date: date),
+                workoutType: generatedType,
+                title: generatedType.displayName,
+                description: "Generated recommendation for today.",
+                duration: nil,
+                distance: nil,
+                targetPace: nil,
+                exercises: nil,
+                isCompleted: false,
+                completedActivityId: nil
+            )
+            workouts.append(original)
+            workoutIndex = workouts.count - 1
+        }
 
         let updated: DailyWorkout
         switch adjustment {
         case .recoveryDay:
+            guard original.workoutType != .rest else { return nil }
             updated = DailyWorkout(
                 id: original.id,
                 date: original.date,
@@ -450,6 +553,7 @@ enum TodayRecommendationPolicy {
                 completedActivityId: original.completedActivityId
             )
         case .easierWorkout:
+            guard original.workoutType != .rest else { return nil }
             if original.workoutType.isRunning {
                 updated = DailyWorkout(
                     id: original.id,
@@ -481,12 +585,44 @@ enum TodayRecommendationPolicy {
                     completedActivityId: original.completedActivityId
                 )
             }
+        case .chosenWorkout(let workoutType):
+            guard workoutType != .rest else { return nil }
+            let template = plan.workouts.first {
+                $0.id != original.id
+                    && $0.workoutType.activity == workoutType.activity
+                    && $0.workoutType != .rest
+            }
+            let defaultDuration: Int
+            switch workoutType {
+            case .recoveryRun, .easyRun, .walking, .stretchMobility, .yoga:
+                defaultDuration = 30
+            case .upperBody, .strengthTraining, .fullBody, .lowerBody:
+                defaultDuration = 40
+            default:
+                defaultDuration = 40
+            }
+            updated = DailyWorkout(
+                id: original.id,
+                date: original.date,
+                dayOfWeek: original.dayOfWeek,
+                workoutType: workoutType,
+                title: workoutType.displayName,
+                description: "Chosen for today. The remaining week will adapt around this session.",
+                duration: template?.duration ?? defaultDuration,
+                distance: workoutType.isRunning ? (template?.distance ?? 3) : nil,
+                targetPace: workoutType.isRunning
+                    ? (template?.targetPace ?? "Conversational effort")
+                    : nil,
+                exercises: workoutType.isStrength ? template?.exercises : nil,
+                isCompleted: original.isCompleted,
+                completedActivityId: original.completedActivityId
+            )
         case .keepPlan:
             return nil
         }
 
-        var workouts = plan.workouts
         workouts[workoutIndex] = updated
+        workouts.sort { $0.date < $1.date }
         let updatedPlan = WeeklyTrainingPlan(
             id: plan.id,
             athleteId: plan.athleteId,
@@ -505,6 +641,8 @@ enum TodayRecommendationPolicy {
         let changeDescription: String
         if adjustment == .recoveryDay {
             changeDescription = "\(original.title) was replaced with recovery."
+        } else if case .chosenWorkout = adjustment {
+            changeDescription = "\(updated.title) was added for today."
         } else if let oldDistance = original.distance, let newDistance = updated.distance {
             changeDescription = "\(original.title) changed from \(String(format: "%.1f", oldDistance)) to \(String(format: "%.1f", newDistance)) mi at an easy effort."
         } else {
@@ -515,8 +653,82 @@ enum TodayRecommendationPolicy {
             plan: updatedPlan,
             originalWorkout: original,
             updatedWorkout: updated,
-            receiptTitle: adjustment == .recoveryDay ? "Recovery added" : "Today's effort reduced",
+            receiptTitle: adjustment == .recoveryDay
+                ? "Recovery added"
+                : (adjustment == .easierWorkout ? "Today's effort reduced" : "Workout added"),
             receiptDetail: scoreContext + changeDescription.prefix(1).lowercased() + changeDescription.dropFirst()
         )
+    }
+
+    static func adaptingRemainingWeek(
+        _ result: TodayWorkoutAdjustmentResult,
+        profile: TrainingProfile,
+        on date: Date = Date(),
+        regenerate: RemainingWeekRegenerator = { plan, profile in
+            try await TrainingPlanService.generatePlan(
+                profile: profile,
+                scope: .remainingCurrentWeek,
+                existingPlan: plan
+            )
+        }
+    ) async throws -> TodayWorkoutAdjustmentResult {
+        let adaptedPlan = try await regenerate(result.plan, profile)
+        let changedDays = changedFutureDayNames(
+            before: result.plan,
+            after: adaptedPlan,
+            after: date
+        )
+        let adaptationDetail = changedDays.isEmpty
+            ? "The rest of the week already fits this choice."
+            : "Rebalanced \(changedDays.joined(separator: ", ")) to keep the week on track."
+        let calendar = Calendar.current
+        let adaptedWorkout = adaptedPlan.workouts.first {
+            calendar.isDate($0.date, inSameDayAs: date)
+        } ?? result.updatedWorkout
+
+        return TodayWorkoutAdjustmentResult(
+            plan: adaptedPlan,
+            originalWorkout: result.originalWorkout,
+            updatedWorkout: adaptedWorkout,
+            receiptTitle: result.receiptTitle,
+            receiptDetail: "\(result.receiptDetail) \(adaptationDetail)"
+        )
+    }
+
+    private static func rolePriority(_ role: TrainingActivityRole) -> Int {
+        switch role {
+        case .primary: return 0
+        case .supporting: return 1
+        case .optional: return 2
+        }
+    }
+
+    private static func changedFutureDayNames(
+        before: WeeklyTrainingPlan,
+        after: WeeklyTrainingPlan,
+        after date: Date
+    ) -> [String] {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        let previous = Dictionary(uniqueKeysWithValues: before.workouts.map {
+            (calendar.startOfDay(for: $0.date), $0)
+        })
+
+        return after.workouts
+            .filter { calendar.startOfDay(for: $0.date) > start }
+            .filter { workout in
+                guard let original = previous[calendar.startOfDay(for: workout.date)] else { return true }
+                return original.workoutType != workout.workoutType
+                    || original.distance != workout.distance
+                    || original.duration != workout.duration
+            }
+            .map { $0.dayOfWeek.rawValue.capitalized }
+    }
+}
+
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

@@ -292,14 +292,47 @@ struct TrainingProfileTests {
     }
 
     @MainActor
+    @Test("First-time personalization creates the current week when no plan exists")
+    func firstProfileCreatesCurrentWeekInsteadOfRebalancingMissingPlan() async {
+        let (defaults, suiteName) = makeDefaults()
+        defer { clear(defaults, suiteName: suiteName) }
+        var receivedScope: PlanRegenerationScope?
+        var receivedInput: WeeklyTrainingPlan?
+        let model = TrainingProfileEditorViewModel(
+            store: TrainingProfileStore(defaults: defaults),
+            currentPlan: { nil },
+            generatePlan: { _, scope, input in
+                receivedScope = scope
+                receivedInput = input
+                return makePresentationPlan(id: "first-current-week")
+            }
+        )
+        model.draft.trainingDaysPerWeek = 4
+        model.draft.activities[0].sessionsPerWeek = 4
+
+        model.save()
+        #expect(model.currentWeekActionTitle == "Create This Week")
+        await model.regenerate(scope: .remainingCurrentWeek)
+
+        if case .initialCurrentWeek = receivedScope {} else {
+            Issue.record("Expected first-time personalization to create the current week")
+        }
+        #expect(receivedInput == nil)
+        #expect(!model.isPresentingRegenerationChoices)
+        #expect(model.shouldDismiss)
+    }
+
+    @MainActor
     @Test("Both regeneration choices forward the approved Task 4 scopes")
     func regenerationChoicesUseApprovedScopes() async {
         let (defaults, suiteName) = makeDefaults()
         defer { clear(defaults, suiteName: suiteName) }
         var scopes: [PlanRegenerationScope] = []
+        let currentPlan = makePresentationPlan(id: "current")
         let model = TrainingProfileEditorViewModel(
             store: TrainingProfileStore(defaults: defaults),
-            generatePlan: { _, scope in
+            currentPlan: { currentPlan },
+            generatePlan: { _, scope, _ in
                 scopes.append(scope)
                 return makePresentationPlan(id: "generated-\(scopes.count)")
             }
@@ -326,7 +359,8 @@ struct TrainingProfileTests {
         var scopes: [PlanRegenerationScope] = []
         let model = TrainingProfileEditorViewModel(
             store: TrainingProfileStore(defaults: defaults),
-            generatePlan: { _, scope in
+            currentPlan: { previousPlan },
+            generatePlan: { _, scope, _ in
                 scopes.append(scope)
                 if scopes.count == 1 { throw PresentationFailure.expected }
                 activePlan = replacementPlan

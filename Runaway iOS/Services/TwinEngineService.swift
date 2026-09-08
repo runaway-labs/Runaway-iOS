@@ -1,5 +1,4 @@
 import Foundation
-import Supabase
 
 struct TwinInsight: Codable {
     let acwr: Double
@@ -30,15 +29,20 @@ class TwinEngineService {
     }
     
     func fetchTwinInsights() async throws -> TwinInsight {
-        guard let athleteId = await UserSession.shared.userId else {
-            throw NSError(domain: "TwinEngine", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
+        throw LocalIntelligenceBoundaryError.retiredCloudTwin
+    }
+}
+
+enum LocalIntelligenceBoundaryError: LocalizedError {
+    case retiredCloudTwin
+    case retiredCloudAnalysis
+
+    var errorDescription: String? {
+        switch self {
+        case .retiredCloudTwin:
+            return "The retired cloud twin is unavailable. Runaway now builds training guidance privately on this device."
+        case .retiredCloudAnalysis:
+            return "Cloud analysis has been retired. Runaway now generates intelligence privately on this device."
         }
-        
-        let response: TwinInsight = try await supabase.functions
-            .invoke("twin-engine", options: .init(
-                body: TwinEngineBody(athlete_id: athleteId)
-            ))
-            
-        return response
     }
 }

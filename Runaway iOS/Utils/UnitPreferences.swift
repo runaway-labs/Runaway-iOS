@@ -14,7 +14,9 @@ final class UnitPreferences: ObservableObject {
     static let shared = UnitPreferences()
 
     private let userDefaults: UserDefaults
-    private let unitKey = "preferred_distance_unit"
+    // Keep the app-wide activity display unit independent from units saved on
+    // individual races and goals. The old key could be changed by those flows.
+    private let unitKey = "preferred_activity_distance_unit"
 
     @Published var distanceUnit: DistanceUnit {
         didSet {
@@ -76,7 +78,20 @@ struct UnitFormatter {
     ///   - includeUnit: Whether to append unit abbreviation (default true)
     /// - Returns: Formatted distance string
     static func formatDistance(_ meters: Double, decimals: Int = 2, includeUnit: Bool = true) -> String {
-        let unit = UnitPreferences.shared.distanceUnit
+        formatDistance(
+            meters,
+            unit: UnitPreferences.shared.distanceUnit,
+            decimals: decimals,
+            includeUnit: includeUnit
+        )
+    }
+
+    static func formatDistance(
+        _ meters: Double,
+        unit: DistanceUnit,
+        decimals: Int = 2,
+        includeUnit: Bool = true
+    ) -> String {
         let value = meters / unit.metersPerUnit
         let formatted = String(format: "%.\(decimals)f", value)
         return includeUnit ? "\(formatted)\(unit.abbreviation)" : formatted
@@ -93,13 +108,20 @@ struct UnitFormatter {
     /// - Parameter secondsPerMeter: Pace in seconds per meter
     /// - Returns: Formatted pace string (e.g., "8:30/mi" or "5:17/km")
     static func formatPace(secondsPerMeter: Double) -> String {
-        let unit = UnitPreferences.shared.distanceUnit
+        formatPace(
+            secondsPerMeter: secondsPerMeter,
+            unit: UnitPreferences.shared.distanceUnit
+        )
+    }
+
+    static func formatPace(secondsPerMeter: Double, unit: DistanceUnit) -> String {
         let secondsPerUnit = secondsPerMeter * unit.metersPerUnit
 
         guard secondsPerUnit > 0 && secondsPerUnit < 60 * 60 else { return "--:--" }
 
-        let minutes = Int(secondsPerUnit) / 60
-        let seconds = Int(secondsPerUnit) % 60
+        let roundedSeconds = Int(secondsPerUnit.rounded())
+        let minutes = roundedSeconds / 60
+        let seconds = roundedSeconds % 60
         return String(format: "%d:%02d/\(unit.abbreviation)", minutes, seconds)
     }
 

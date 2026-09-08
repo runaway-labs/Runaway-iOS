@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Runaway_iOS
 
+@Suite(.serialized)
 struct TodayRecommendationPolicyTests {
     @Test func poorReadinessRecommendsRecovery() {
         let recommendation = TodayRecommendationPolicy.recommendation(readinessScore: 29)
@@ -251,6 +252,29 @@ struct TodayRecommendationPolicyTests {
         #expect(result.receiptDetail.contains("42"))
     }
 
+    @Test func userSelectedRecoveryRemainsVisibleWhenReadinessImproves() throws {
+        let fixture = makePlan()
+        let result = try #require(TodayRecommendationPolicy.applying(
+            .recoveryDay,
+            to: fixture.plan,
+            on: fixture.today,
+            readinessScore: 42
+        ))
+
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: result.updatedWorkout,
+            profile: profile([(.running, .primary, 3), (.mobility, .supporting, 1)]),
+            recentCompletedWorkouts: [],
+            readinessScore: 73,
+            schedulingContext: context(on: fixture.today)
+        )
+
+        #expect(recommendation.workoutType == .rest)
+        #expect(recommendation.title == result.updatedWorkout.title)
+        #expect(recommendation.status == "Your Choice")
+        #expect(recommendation.adjustment == .keepPlan)
+    }
+
     @Test func easierChoiceReducesDistanceAndRemovesIntensity() throws {
         let fixture = makePlan()
         let result = try #require(TodayRecommendationPolicy.applying(
@@ -277,6 +301,177 @@ struct TodayRecommendationPolicyTests {
         )
 
         #expect(result == nil)
+    }
+
+    @Test func moderateReadinessOffersProfileSelectedWorkoutAlternatives() {
+        let alternatives = TodayRecommendationPolicy.workoutAlternatives(
+            profile: profile([
+                (.running, .primary, 3),
+                (.strength, .supporting, 2),
+                (.mobility, .optional, 1)
+            ]),
+            readinessScore: 58
+        )
+
+        #expect(alternatives.contains(.recoveryRun))
+        #expect(alternatives.contains(.upperBody))
+        #expect(!alternatives.contains {
+            $0.isHighIntensity || ($0.isLowerBodyDemanding && !$0.isRecoveryCompatible)
+        })
+    }
+
+    @Test func allSafeProfileActivitiesAppearAsWorkoutAlternatives() {
+        let alternatives = TodayRecommendationPolicy.workoutAlternatives(
+            profile: profile([
+                (.running, .primary, 3),
+                (.strength, .supporting, 2),
+                (.walking, .supporting, 1),
+                (.mobility, .supporting, 1)
+            ]),
+            readinessScore: 73
+        )
+
+        #expect(alternatives == [.easyRun, .stretchMobility, .upperBody, .walking])
+    }
+
+    @Test func normalPlannedWorkoutStillOffersTrainingChoice() {
+        let plannedWorkout = makePlan().plan.workouts.first
+
+        #expect(TodayRecommendationPolicy.canChooseTodaysTraining(
+            plannedWorkout: plannedWorkout,
+            hasCompletedActivity: false
+        ))
+        #expect(!TodayRecommendationPolicy.canChooseTodaysTraining(
+            plannedWorkout: plannedWorkout,
+            hasCompletedActivity: true
+        ))
+    }
+
+    @Test func missingTrainingProfileBlocksWorkoutAlternatives() {
+        #expect(TrainingChoiceAvailabilityPolicy.requiresProfileSetup(
+            needsPersonalization: true
+        ))
+        #expect(!TrainingChoiceAvailabilityPolicy.requiresProfileSetup(
+            needsPersonalization: false
+        ))
+    }
+
+    @Test func chosenWorkoutCanReplaceAPlannedRestDay() throws {
+        let fixture = makePlan()
+        let original = fixture.plan.workouts[0]
+        let rest = DailyWorkout(
+            id: original.id,
+            date: original.date,
+            dayOfWeek: original.dayOfWeek,
+            workoutType: .rest,
+            title: "Rest Day",
+            description: "Recover.",
+            duration: nil,
+            distance: nil,
+            targetPace: nil,
+            exercises: nil,
+            isCompleted: false,
+            completedActivityId: nil
+        )
+        var workouts = fixture.plan.workouts
+        workouts[0] = rest
+        let restPlan = WeeklyTrainingPlan(
+            id: fixture.plan.id,
+            athleteId: fixture.plan.athleteId,
+            weekStartDate: fixture.plan.weekStartDate,
+            weekEndDate: fixture.plan.weekEndDate,
+            workouts: workouts,
+            weekNumber: fixture.plan.weekNumber,
+            totalMileage: workouts.filter { $0.workoutType.isRunning }.compactMap(\.distance).reduce(0, +),
+            focusArea: fixture.plan.focusArea,
+            notes: fixture.plan.notes,
+            generatedAt: fixture.plan.generatedAt,
+            goalId: fixture.plan.goalId
+        )
+
+        let result = try #require(TodayRecommendationPolicy.applying(
+            .chosenWorkout(.upperBody),
+            to: restPlan,
+            on: fixture.today,
+            readinessScore: 58
+        ))
+
+        #expect(result.updatedWorkout.workoutType == .upperBody)
+        #expect(result.updatedWorkout.duration != nil)
+        #expect(result.plan.workouts[1].id == restPlan.workouts[1].id)
+    }
+
+    @Test func chosenWorkoutCanFillAnEmptyPlanDay() throws {
+        let fixture = makePlan()
+        let emptyDate = Calendar.current.date(
+            byAdding: .day,
+            value: 2,
+            to: fixture.today
+        )!
+
+        let result = try #require(TodayRecommendationPolicy.applying(
+            .chosenWorkout(.upperBody),
+            to: fixture.plan,
+            on: emptyDate,
+            readinessScore: 73
+        ))
+
+        #expect(result.plan.workouts.count == fixture.plan.workouts.count + 1)
+        #expect(result.updatedWorkout.workoutType == .upperBody)
+        #expect(Calendar.current.isDate(result.updatedWorkout.date, inSameDayAs: emptyDate))
+    }
+
+    @Test func adaptiveChoiceUsesRemainingWeekRegeneratorAndReportsFutureChanges() async throws {
+        let fixture = makePlan()
+        let local = try #require(TodayRecommendationPolicy.applying(
+            .recoveryDay,
+            to: fixture.plan,
+            on: fixture.today,
+            readinessScore: 42
+        ))
+        let originalTomorrow = local.plan.workouts[1]
+        let revisedTomorrow = DailyWorkout(
+            id: originalTomorrow.id,
+            date: originalTomorrow.date,
+            dayOfWeek: originalTomorrow.dayOfWeek,
+            workoutType: .stretchMobility,
+            title: "Mobility",
+            description: "Rebalanced.",
+            duration: 20,
+            distance: nil,
+            targetPace: nil,
+            exercises: nil,
+            isCompleted: false,
+            completedActivityId: nil
+        )
+        var revisedWorkouts = local.plan.workouts
+        revisedWorkouts[1] = revisedTomorrow
+        let revisedPlan = WeeklyTrainingPlan(
+            id: local.plan.id,
+            athleteId: local.plan.athleteId,
+            weekStartDate: local.plan.weekStartDate,
+            weekEndDate: local.plan.weekEndDate,
+            workouts: revisedWorkouts,
+            weekNumber: local.plan.weekNumber,
+            totalMileage: revisedWorkouts.filter { $0.workoutType.isRunning }.compactMap(\.distance).reduce(0, +),
+            focusArea: local.plan.focusArea,
+            notes: local.plan.notes,
+            generatedAt: local.plan.generatedAt,
+            goalId: local.plan.goalId
+        )
+
+        let adapted = try await TodayRecommendationPolicy.adaptingRemainingWeek(
+            local,
+            profile: profile([(.running, .primary, 4)]),
+            on: fixture.today,
+            regenerate: { input, _ in
+                #expect(input.workouts[0].workoutType == .rest)
+                return revisedPlan
+            }
+        )
+
+        #expect(adapted.plan.workouts[1].workoutType == .stretchMobility)
+        #expect(adapted.receiptDetail.contains("Rebalanced"))
     }
 
     @Test func genericRecordedRunCannotDowngradeLinkedPlannedLongRun() throws {
@@ -586,13 +781,16 @@ struct TodayRecommendationPolicyTests {
 
     private func makePlan() -> (plan: WeeklyTrainingPlan, today: Date) {
         let calendar = Calendar(identifier: .gregorian)
-        let today = calendar.date(from: DateComponents(year: 2026, month: 8, day: 26))!
+        let currentDay = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: currentDay)
+        let weekStart = calendar.date(byAdding: .day, value: -(weekday - 1), to: currentDay)!
+        let today = calendar.date(byAdding: .day, value: 3, to: weekStart)!
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
         let workouts = [
             DailyWorkout(
                 id: "today",
                 date: today,
-                dayOfWeek: .wednesday,
+                dayOfWeek: DayOfWeek.from(date: today),
                 workoutType: .tempoRun,
                 title: "Tempo Run",
                 description: "Planned quality session",
@@ -606,7 +804,7 @@ struct TodayRecommendationPolicyTests {
             DailyWorkout(
                 id: "tomorrow",
                 date: tomorrow,
-                dayOfWeek: .thursday,
+                dayOfWeek: DayOfWeek.from(date: tomorrow),
                 workoutType: .easyRun,
                 title: "Easy Run",
                 description: "Easy miles",
@@ -622,8 +820,8 @@ struct TodayRecommendationPolicyTests {
             WeeklyTrainingPlan(
                 id: "week",
                 athleteId: 1,
-                weekStartDate: calendar.date(byAdding: .day, value: -3, to: today)!,
-                weekEndDate: calendar.date(byAdding: .day, value: 3, to: today)!,
+                weekStartDate: weekStart,
+                weekEndDate: calendar.date(byAdding: .day, value: 6, to: weekStart)!,
                 workouts: workouts,
                 weekNumber: 1,
                 totalMileage: 10,
