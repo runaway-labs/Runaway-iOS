@@ -68,6 +68,7 @@
 		8E06B7C62F0434C700A17DDE /* Exceptions for "Runaway iOS" folder in "Runaway iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"Runaway iOSTests/ActivityRecordingRetirementTests.swift",
 				"Runaway iOSTests/ActivityObservationGeneratorTests.swift",
 				"Runaway iOSTests/AthleteServiceTests.swift",
 				"Runaway iOSTests/ComplementarySchedulingPolicyTests.swift",
@@ -100,6 +101,7 @@
 		8E6C2E6B2D943666002619A0 /* Exceptions for "Runaway iOS" folder in "Runaway iOSTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"Runaway iOSTests/ActivityRecordingRetirementTests.swift",
 				"Runaway iOSTests/ActivityObservationGeneratorTests.swift",
 				"Runaway iOSTests/AthleteServiceTests.swift",
 				"Runaway iOSTests/ComplementarySchedulingPolicyTests.swift",
@@ -594,11 +596,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Runaway uses your health data to calculate your daily readiness score, track recovery, and provide personalized training recommendations based on your sleep, heart rate variability, and resting heart rate.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Runaway saves your workouts to Apple Health so they appear in the Fitness app and contribute to your Activity rings.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Runaway needs background location access to continue tracking your run when your phone is locked or in your pocket.";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Runaway iOS needs Location access for \"some reason\"!";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runaway needs your location to track your runs and display your route on the map.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Runaway uses motion sensors to measure your running cadence during the onboarding assessment, helping personalize your training recommendations.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Runaway uses speech recognition to enable voice commands during your runs, allowing hands-free control of your workout.";
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runaway uses your location for local weather and training context.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -640,11 +638,7 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Runaway uses your health data to calculate your daily readiness score, track recovery, and provide personalized training recommendations based on your sleep, heart rate variability, and resting heart rate.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Runaway saves your workouts to Apple Health so they appear in the Fitness app and contribute to your Activity rings.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Runaway needs background location access to continue tracking your run when your phone is locked or in your pocket.";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "Runaway iOS needs Location access for \"some reason\"!";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runaway needs your location to track your runs and display your route on the map.";
-				INFOPLIST_KEY_NSMotionUsageDescription = "Runaway uses motion sensors to measure your running cadence during the onboarding assessment, helping personalize your training recommendations.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Runaway uses speech recognition to enable voice commands during your runs, allowing hands-free control of your workout.";
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Runaway uses your location for local weather and training context.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;

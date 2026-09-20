@@ -15,6 +15,5 @@ struct RunawayWidgetBundle: WidgetBundle {
         CommitmentWidget()
         RaceCountdownWidget()
         RunawayWidgetControl()
-        RunawayWidgetLiveActivity()
     }
 }

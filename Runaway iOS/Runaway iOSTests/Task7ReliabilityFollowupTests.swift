@@ -149,13 +149,6 @@ final class Task7ReliabilityFollowupTests: XCTestCase {
         }
     }
 
-    func testAccessibilityLayoutUsesVerticalControlsAndAllowsMultilineStats() {
-        XCTAssertFalse(RunRecordingLayoutPolicy.usesVerticalControls(for: .large))
-        XCTAssertEqual(RunRecordingLayoutPolicy.statLineLimit(for: .large), 1)
-        XCTAssertTrue(RunRecordingLayoutPolicy.usesVerticalControls(for: .accessibility3))
-        XCTAssertEqual(RunRecordingLayoutPolicy.statLineLimit(for: .accessibility3), 2)
-    }
-
     func testSimulatorHTTPSProxyRequiresExplicitConfiguration() {
         XCTAssertNil(simulatorHTTPSProxyDictionary(environment: [:]))
 
