@@ -4,6 +4,686 @@ import Testing
 
 @Suite(.serialized)
 struct TodayRecommendationPolicyTests {
+    private func earlierSessionResult(_ result: TrainingSessionResult, days: Int) -> TrainingSessionResult {
+        let date = result.completedAt.addingTimeInterval(-Double(days) * 86_400)
+        let old = result.reference
+        let reference = TrainingSessionResult.Reference(athleteID: old.athleteID, goalID: old.goalID,
+            goalTitle: old.goalTitle, fingerprint: old.fingerprint + "/earlier/\(days)",
+            policyVersion: old.policyVersion, generatedAt: date, distanceUnit: old.distanceUnit,
+            massUnit: old.massUnit, prescribedSeconds: old.prescribedSeconds, items: old.items)
+        return TrainingSessionResult(id: UUID(), reference: reference, completedAt: date, recordedAt: date,
+            elapsedSeconds: result.elapsedSeconds, perceivedEffort: result.perceivedEffort,
+            bodyState: result.bodyState, entries: result.entries)
+    }
+
+    @Test func resultDrivenInputsChangeFingerprintAndRejectWrongOwner() throws {
+        let result = sessionResultFixture()
+        let profile = AthleteTrainingProfile(athleteID: 42)
+        let now = result.recordedAt.addingTimeInterval(1)
+        let zone = TimeZone(secondsFromGMT: 0)!
+        let before = try TrainingDecisionInputBuilder.build(profile: profile, history: [], athleteID: 42, now: now, timeZone: zone)
+        let after = try TrainingDecisionInputBuilder.build(profile: profile, history: [], athleteID: 42, now: now, timeZone: zone, sessionResults: [result])
+        #expect(before.fingerprint != after.fingerprint)
+        #expect(after.sessionResults.count == 1)
+        #expect(throws: TrainingDecisionInputBuilder.InputError.ownershipMismatch) {
+            try TrainingDecisionInputBuilder.build(profile: AthleteTrainingProfile(athleteID: 43), history: [], athleteID: 43,
+                now: now, timeZone: zone, sessionResults: [result])
+        }
+    }
+
+    @Test func resultDrivenInputsExcludeFutureResultsAndRejectDuplicates() throws {
+        let result = sessionResultFixture()
+        let profile = AthleteTrainingProfile(athleteID: 42)
+        let now = result.recordedAt.addingTimeInterval(-1)
+        let zone = TimeZone(secondsFromGMT: 0)!
+        let inputs = try TrainingDecisionInputBuilder.build(profile: profile, history: [], athleteID: 42,
+            now: now, timeZone: zone, sessionResults: [result])
+        #expect(inputs.sessionResults.isEmpty)
+        #expect(throws: TrainingDecisionInputBuilder.InputError.invalidHistory) {
+            try TrainingDecisionInputBuilder.build(profile: profile, history: [], athleteID: 42,
+                now: now, timeZone: zone, sessionResults: [result, result])
+        }
+    }
+
+    @Test func progressionNeedsDistinctMatchingCompletedDays() {
+        let result = sessionResultFixture()
+        let old = earlierSessionResult(result, days: 3)
+        let now = result.recordedAt.addingTimeInterval(1)
+        #expect(TrainingProgressionService.assess(goalID: result.reference.goalID, athleteID: 42,
+            results: [old, result], on: now).state == .reviewIncrease)
+        #expect(TrainingProgressionService.assess(goalID: result.reference.goalID, athleteID: 42,
+            results: [result], on: now).state == .repeatDose)
+    }
+
+    @Test func progressionDoesNotSkipLatestPartialOrDifficultResult() {
+        var result = sessionResultFixture()
+        let old = earlierSessionResult(result, days: 3)
+        result.entries[0].repetitions = 4
+        #expect(TrainingProgressionService.assess(goalID: result.reference.goalID, athleteID: 42,
+            results: [old, result], on: result.recordedAt.addingTimeInterval(1)).state == .hold)
+        result.entries[0].repetitions = 8
+        result.perceivedEffort = 9
+        #expect(TrainingProgressionService.assess(goalID: result.reference.goalID, athleteID: 42,
+            results: [old, result], on: result.recordedAt.addingTimeInterval(1)).state == .reviewRecovery)
+    }
+
+    @Test func progressionDoesNotTreatChangedDoseAsRepeatedEvidence() {
+        let result = sessionResultFixture()
+        var old = earlierSessionResult(result, days: 3)
+        old.entries[0].loadKilograms = 40
+        #expect(TrainingProgressionService.assess(goalID: result.reference.goalID, athleteID: 42,
+            results: [old, result], on: result.recordedAt.addingTimeInterval(1)).state == .repeatDose)
+    }
+
+    @Test func remainingWeekPreservesExplicitRestAndWorkoutDespiteAvailability() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let sunday = calendar.date(from: DateComponents(year: 2026, month: 9, day: 13))!
+        let monday = calendar.date(byAdding: .day, value: 1, to: sunday)!
+        let tuesday = calendar.date(byAdding: .day, value: 2, to: sunday)!
+        let workouts = [
+            DailyWorkout(id: "rest", date: monday, dayOfWeek: .monday, workoutType: .rest, title: "Rest",
+                description: "", duration: nil, distance: nil, targetPace: nil, exercises: nil, isCompleted: false, completedActivityId: nil),
+            DailyWorkout(id: "choice", date: tuesday, dayOfWeek: .tuesday, workoutType: .easyRun, title: "My run",
+                description: "Chosen for today", duration: 30, distance: nil, targetPace: nil, exercises: nil, isCompleted: false, completedActivityId: nil)
+        ]
+        let review = RemainingWeekTrainingPolicy.review(workouts: workouts, results: [], availability: [], on: sunday, calendar: calendar)
+        #expect(review.count == 6)
+        #expect(review[0].state == .preserved)
+        #expect(review[1].state == .preserved)
+    }
+
+    @Test func remainingWeekFlagsTimeConflictWithoutCountingMissedPlansAsRecovery() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let sunday = calendar.date(from: DateComponents(year: 2026, month: 9, day: 13))!
+        let monday = calendar.date(byAdding: .day, value: 1, to: sunday)!
+        let planned = DailyWorkout(id: "monday", date: monday, dayOfWeek: .monday, workoutType: .easyRun,
+            title: "Easy run", description: "", duration: 45, distance: nil, targetPace: nil,
+            exercises: nil, isCompleted: false, completedActivityId: nil)
+        let review = RemainingWeekTrainingPolicy.review(workouts: [planned], results: [],
+            availability: [.init(weekday: 2, availableMinutes: 30)], on: sunday, calendar: calendar)
+        #expect(review[0].state == .timeConflict)
+        #expect(review[0].title == "Easy run")
+        #expect(review.allSatisfy { $0.date > sunday })
+    }
+
+    private func sessionResultFixture() -> TrainingSessionResult {
+        let date = Date(timeIntervalSince1970: 1_789_200_000)
+        let item = TrainingSessionResult.Item(id: "bench/1", title: "Bench press, set 1",
+            kind: .strength, exerciseID: "barbell-bench-press", seconds: nil,
+            repetitions: 6...8, convention: .total, loadKilograms: nil, assistanceKilograms: nil)
+        let reference = TrainingSessionResult.Reference(athleteID: 42, goalID: UUID(),
+            goalTitle: "Bench goal", fingerprint: "fixture", policyVersion: "test-v1",
+            generatedAt: date, distanceUnit: .miles, massUnit: .pounds,
+            prescribedSeconds: 900, items: [item])
+        let actual = TrainingSessionResult.Entry(itemID: item.id, skipped: false,
+            seconds: nil, repetitions: 8, loadKilograms: 45, assistanceKilograms: nil,
+            repsInReserve: 3)
+        return TrainingSessionResult(id: UUID(), reference: reference, completedAt: date,
+            recordedAt: date, elapsedSeconds: 900, perceivedEffort: 5, bodyState: .good,
+            entries: [actual])
+    }
+
+    @Test func sessionResultsRequireActualCalibrationLoadAndEffort() {
+        var result = sessionResultFixture()
+        #expect(result.isValid)
+        result.entries[0].loadKilograms = nil
+        #expect(!result.isValid)
+        result.entries[0].loadKilograms = 45
+        result.entries[0].repsInReserve = nil
+        #expect(!result.isValid)
+    }
+
+    @Test func sessionResultsRejectDuplicatedAndMissingEntries() {
+        var result = sessionResultFixture()
+        result.entries.append(result.entries[0])
+        #expect(!result.isValid)
+        result.entries = []
+        #expect(!result.isValid)
+    }
+
+    @Test func sessionResultsDoNotTreatSkippedSetsAsCompletedWork() {
+        var result = sessionResultFixture()
+        var second = result.reference.items[0]
+        second.id = "bench/2"
+        result.reference.items.append(second)
+        result.entries.append(.init(itemID: "bench/2", skipped: true, seconds: nil,
+            repetitions: nil, loadKilograms: nil, assistanceKilograms: nil, repsInReserve: nil))
+        #expect(result.isValid)
+        #expect(result.isPartial)
+        result.entries[1].repetitions = 8
+        #expect(!result.isValid)
+    }
+
+    @Test func sessionResultsRejectInvalidTimesAndGlobalEffort() {
+        var result = sessionResultFixture()
+        result.elapsedSeconds = .nan
+        #expect(!result.isValid)
+        result.elapsedSeconds = 900
+        result.perceivedEffort = 0
+        #expect(!result.isValid)
+        result.perceivedEffort = 5
+        result.completedAt = result.recordedAt.addingTimeInterval(1)
+        #expect(!result.isValid)
+    }
+
+    @MainActor @Test func sessionResultsPersistAtomicallyAndRetriesDoNotDuplicate() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = ProtectedTrainingRepository(root: root, activeAthleteID: { 42 })
+        let result = sessionResultFixture()
+        #expect(try repository.appendSessionResult(result, athleteID: 42) == result)
+        #expect(try repository.appendSessionResult(result, athleteID: 42) == result)
+        #expect(try repository.sessionResults(athleteID: 42) == [result])
+        var duplicate = result
+        duplicate.id = UUID()
+        #expect(throws: (any Error).self) { try repository.appendSessionResult(duplicate, athleteID: 42) }
+        #expect(try repository.sessionResults(athleteID: 42).count == 1)
+    }
+
+    @MainActor @Test func sessionResultsRejectDifferentOwnerAndConflictingRetry() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = ProtectedTrainingRepository(root: root, activeAthleteID: { 42 })
+        var result = sessionResultFixture()
+        #expect(throws: (any Error).self) { try repository.appendSessionResult(result, athleteID: 43) }
+        try repository.appendSessionResult(result, athleteID: 42)
+        result.entries[0].repetitions = 7
+        #expect(throws: (any Error).self) { try repository.appendSessionResult(result, athleteID: 42) }
+        #expect(try repository.sessionResults(athleteID: 42).first?.entries[0].repetitions == 8)
+    }
+
+    @Test func runningPrescriptionKeepsWarmupAndCooldownInsideBudget() {
+        guard case .session(let run) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 1_800, availableSeconds: 1_200
+        ) else { Issue.record("Expected a time-bounded running prescription"); return }
+        #expect(run.warmupSeconds == 300)
+        #expect(run.runningSeconds == 600)
+        #expect(run.cooldownSeconds == 300)
+        #expect(run.totalSeconds == 1_200)
+    }
+
+    @Test func runningPrescriptionDoesNotExceedObservedDurationOrPreviewCap() {
+        guard case .session(let short) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 475.9, availableSeconds: 3_600
+        ), case .session(let long) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 7_200, availableSeconds: 3_600
+        ) else { Issue.record("Expected duration-limited sessions"); return }
+        #expect(short.runningSeconds == 475)
+        #expect(short.totalSeconds == 1_075)
+        #expect(long.runningSeconds == 1_200)
+        #expect(long.totalSeconds == 1_800)
+    }
+
+    @Test func runningPrescriptionBlocksMissingAndInvalidEvidence() {
+        let invalid: [Double?] = [nil, 0, -1, .nan, .infinity, 299.9]
+        for elapsed in invalid {
+            guard case .needsInput = RunningPrescriptionPolicy.make(
+                recordedElapsedSeconds: elapsed, availableSeconds: 1_800
+            ) else { Issue.record("Invalid evidence must not create a run"); continue }
+        }
+    }
+
+    @Test func runningPrescriptionBlocksInsufficientTimeWithoutOverflow() {
+        for budget in [Int.min, -1, 0, 899] {
+            guard case .needsInput = RunningPrescriptionPolicy.make(
+                recordedElapsedSeconds: 1_800, availableSeconds: budget
+            ) else { Issue.record("Insufficient time must not remove warm-up or cooldown"); continue }
+        }
+        guard case .session(let minimum) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 300, availableSeconds: 900
+        ) else { Issue.record("The minimum supported session should fit"); return }
+        #expect(minimum.totalSeconds == 900)
+    }
+
+    @Test func runningPrescriptionWalkBreakReplacesWorkRatherThanAddingTime() {
+        guard case .session(let run) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 1_800, availableSeconds: 1_800
+        ) else { Issue.record("Expected running prescription"); return }
+        let blocks = run.blocks(includingWalkBreak: true)
+        #expect(blocks.map(\.phase) == [.warmup, .running, .recovery, .running, .cooldown])
+        #expect(blocks.map(\.durationSeconds) == [300, 570, 60, 570, 300])
+        #expect(blocks.reduce(0) { $0 + $1.durationSeconds } == 1_800)
+        #expect(blocks.filter { $0.phase == .running }.reduce(0) { $0 + $1.durationSeconds } == 1_140)
+    }
+
+    @Test func runningPrescriptionOddDurationRetainsEverySecondWithRecovery() {
+        guard case .session(let run) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 475.9, availableSeconds: 1_800
+        ) else { Issue.record("Expected running prescription"); return }
+        #expect(run.blocks(includingWalkBreak: true).map(\.durationSeconds) == [300, 207, 60, 208, 300])
+        #expect(run.blocks(includingWalkBreak: false).map(\.durationSeconds) == [300, 475, 300])
+        #expect(run.blocks(includingWalkBreak: false).map(\.phase) == [.warmup, .running, .cooldown])
+    }
+
+    @Test func runningPrescriptionMinimumRetainsPositiveWorkOnBothSidesOfBreak() {
+        guard case .session(let run) = RunningPrescriptionPolicy.make(
+            recordedElapsedSeconds: 300, availableSeconds: 900
+        ) else { Issue.record("Expected minimum session"); return }
+        #expect(run.blocks(includingWalkBreak: true).map(\.durationSeconds) == [300, 120, 60, 120, 300])
+    }
+
+    @Test func runningEvidenceDistanceUsesSavedGoalUnits() {
+        #expect(abs(RunningPrescriptionPolicy.distanceValue(meters: 1_609.344, unit: .miles) - 1) < 0.000_001)
+        #expect(RunningPrescriptionPolicy.distanceValue(meters: 5_000, unit: .kilometers) == 5)
+        #expect(abs(RunningPrescriptionPolicy.distanceValue(meters: 5_000, unit: .miles) - 3.106_856) < 0.000_001)
+    }
+
+    @Test func completeStrengthSessionFitsThirtyMinutesWithoutDroppingPatterns() throws {
+        let result = CompleteStrengthSessionPolicy.make(
+            anchor: completeStrengthAnchor, equipment: .fullGym,
+            availableSeconds: 1_800, evidence: [], now: testDate
+        )
+        guard case .session(let session) = result else {
+            Issue.record("Expected a complete session"); return
+        }
+        #expect(session.blocks.count == 4)
+        #expect(Set(session.blocks.map(\.pattern)).count == 4)
+        #expect(session.blocks.first?.exerciseID == "barbell-bench-press")
+        #expect(session.blocks.map(\.sets) == [2, 2, 2, 1])
+        #expect(session.totalSeconds == 1_770)
+        #expect(session.blocks.first?.resistance == .external(kilograms: 45.359237, convention: .total))
+        #expect(session.blocks.dropFirst().allSatisfy { $0.requiresCalibration })
+    }
+
+    @Test func completeStrengthSessionRejectsInsufficientTimeAndEquipment() {
+        let tooShort = CompleteStrengthSessionPolicy.make(
+            anchor: completeStrengthAnchor, equipment: .fullGym,
+            availableSeconds: 1_200, evidence: [], now: testDate
+        )
+        guard case .needsInput = tooShort else { Issue.record("Must not silently drop a movement"); return }
+        let incompatible = CompleteStrengthSessionPolicy.make(
+            anchor: completeStrengthAnchor, equipment: .bodyweight,
+            availableSeconds: 3_600, evidence: [], now: testDate
+        )
+        guard case .needsInput = incompatible else { Issue.record("Must not invent a barbell"); return }
+    }
+
+    @Test func completeStrengthSessionUsesOnlyMatchingMeasuredComplementLoads() {
+        let evidence = [CompleteStrengthSessionPolicy.Evidence(
+            exerciseID: "dumbbell-row", loadKilograms: 12, convention: .perHand,
+            repetitions: 8, repsInReserve: 3, measuredAt: testDate.addingTimeInterval(-86_400)
+        )]
+        let result = CompleteStrengthSessionPolicy.make(
+            anchor: completeStrengthAnchor, equipment: .fullGym,
+            availableSeconds: 2_400, evidence: evidence, now: testDate
+        )
+        guard case .session(let session) = result else { Issue.record("Expected session"); return }
+        #expect(session.blocks[1].exerciseID == "dumbbell-row")
+        #expect(session.blocks[1].resistance == .external(kilograms: 12, convention: .perHand))
+        #expect(!session.blocks[1].requiresCalibration)
+        #expect(session.blocks[2].requiresCalibration)
+        #expect(session.blocks[3].requiresCalibration)
+        #expect(session.totalSeconds == 1_920)
+    }
+
+    @Test func completeStrengthSessionDoesNotBorrowStaleOrWrongConventionLoads() {
+        let evidence = [
+            CompleteStrengthSessionPolicy.Evidence(exerciseID: "dumbbell-row", loadKilograms: 99, convention: .total, repetitions: 12, repsInReserve: 3, measuredAt: testDate.addingTimeInterval(-86_400)),
+            CompleteStrengthSessionPolicy.Evidence(exerciseID: "dumbbell-row", loadKilograms: 10, convention: .perHand, repetitions: 12, repsInReserve: 3, measuredAt: testDate.addingTimeInterval(-40 * 86_400))
+        ]
+        let result = CompleteStrengthSessionPolicy.make(anchor: completeStrengthAnchor, equipment: .fullGym,
+            availableSeconds: 2_400, evidence: evidence, now: testDate)
+        guard case .session(let session) = result else { Issue.record("Expected session"); return }
+        #expect(session.blocks[1].requiresCalibration)
+    }
+
+    @Test func completeStrengthSessionDoesNotReuseOlderEasySetAfterLatestHardSet() {
+        let evidence = [
+            CompleteStrengthSessionPolicy.Evidence(exerciseID: "dumbbell-row", loadKilograms: 12, convention: .perHand, repetitions: 8, repsInReserve: 3, measuredAt: testDate.addingTimeInterval(-2 * 86_400)),
+            CompleteStrengthSessionPolicy.Evidence(exerciseID: "dumbbell-row", loadKilograms: 12, convention: .perHand, repetitions: 6, repsInReserve: 0, measuredAt: testDate.addingTimeInterval(-86_400))
+        ]
+        let result = CompleteStrengthSessionPolicy.make(anchor: completeStrengthAnchor, equipment: .fullGym,
+            availableSeconds: 2_400, evidence: evidence, now: testDate)
+        guard case .session(let session) = result else { Issue.record("Expected session"); return }
+        #expect(session.blocks[1].requiresCalibration)
+    }
+
+    private var completeStrengthAnchor: GoalSessionPreview.Strength {
+        .init(exerciseID: "barbell-bench-press", sets: 2, repetitions: 6...8,
+              resistance: .external(kilograms: 45.359237, convention: .total),
+              warmupSeconds: 300, setupSeconds: 120, secondsReservedPerSet: 60,
+              restBetweenSetsSeconds: 90, cooldownSeconds: 180,
+              effortInstruction: "Finish with 2-3 reps in reserve.")
+    }
+
+    @Test func shadowSelectionBalancesEqualPriorityDisciplines() {
+        let history = [GoalDailyShadowPolicy.CompletedDay(discipline: .running, date: testDate.addingTimeInterval(-86_400))]
+        let decision = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates, history: history, on: testDate, readinessScore: 87
+        )
+        #expect(decision.selectedGoalID == shadowCandidates[1].goalID)
+        #expect(decision.rankings.first?.discipline == .strength)
+        #expect(decision.rankings.first?.shareDeficit == 0.5)
+    }
+
+    @Test func shadowSelectionDoesNotFavorRunningWhenStrengthWasCompleted() {
+        let history = [GoalDailyShadowPolicy.CompletedDay(discipline: .strength, date: testDate.addingTimeInterval(-86_400))]
+        let decision = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates, history: history, on: testDate, readinessScore: 87
+        )
+        #expect(decision.selectedGoalID == shadowCandidates[0].goalID)
+    }
+
+    @Test func shadowSelectionCountsTrainingDaysNotIndividualStrengthSets() {
+        let run = GoalDailyShadowPolicy.CompletedDay(discipline: .running, date: testDate.addingTimeInterval(-2 * 86_400))
+        let set = GoalDailyShadowPolicy.CompletedDay(discipline: .strength, date: testDate.addingTimeInterval(-86_400))
+        let decision = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates, history: [run, set, set, set], on: testDate, readinessScore: 87
+        )
+        #expect(decision.rankings.map(\.completedDays) == [1, 1])
+        #expect(decision.rankings.allSatisfy { $0.shareDeficit == 0 })
+        #expect(decision.selectedGoalID == shadowCandidates[0].goalID)
+    }
+
+    @Test func shadowSelectionSurfacesExactTiesRatherThanPickingAlphabetically() {
+        let decision = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates.reversed(), history: [], on: testDate, readinessScore: 87
+        )
+        #expect(decision.selectedGoalID == nil)
+        #expect(Set(decision.choiceGoalIDs) == Set(shadowCandidates.map(\.goalID)))
+    }
+
+    @Test func shadowSelectionBlocksMissingOrNonProceedReadiness() {
+        let scores: [Int?] = [nil, -1, 35, 69, 101]
+        for score in scores {
+            let decision = GoalDailyShadowPolicy.select(
+                candidates: shadowCandidates, history: [], on: testDate, readinessScore: score
+            )
+            #expect(decision.selectedGoalID == nil)
+            #expect(decision.choiceGoalIDs.isEmpty)
+            #expect(decision.blocker != nil)
+        }
+    }
+
+    @Test func shadowSelectionPreservesExplicitChoiceAndDoesNotFillBlockedPrimaryWithSupport() {
+        let preserved = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates, history: [], on: testDate,
+            readinessScore: nil, preserveUserChoice: true
+        )
+        #expect(preserved.preservesUserChoice)
+        #expect(preserved.selectedGoalID == nil)
+        let candidates = [
+            GoalDailyShadowPolicy.Candidate(goalID: shadowCandidates[0].goalID, discipline: .running, isPrimary: true, blocker: "No recent run"),
+            GoalDailyShadowPolicy.Candidate(goalID: shadowCandidates[1].goalID, discipline: .strength, isPrimary: false, blocker: nil)
+        ]
+        let blocked = GoalDailyShadowPolicy.select(candidates: candidates, history: [], on: testDate, readinessScore: 87)
+        #expect(blocked.selectedGoalID == nil)
+        #expect(blocked.blocker != nil)
+    }
+
+    @Test func shadowSelectionRejectsAnotherSessionTodayAndIgnoresFutureAndOldHistory() {
+        let completed = GoalDailyShadowPolicy.CompletedDay(discipline: .running, date: testDate)
+        let blocked = GoalDailyShadowPolicy.select(
+            candidates: shadowCandidates, history: [completed], on: testDate, readinessScore: 87
+        )
+        #expect(blocked.blocker != nil)
+        let outside = [
+            GoalDailyShadowPolicy.CompletedDay(discipline: .running, date: testDate.addingTimeInterval(86_400)),
+            GoalDailyShadowPolicy.CompletedDay(discipline: .strength, date: testDate.addingTimeInterval(-8 * 86_400))
+        ]
+        let decision = GoalDailyShadowPolicy.select(candidates: shadowCandidates, history: outside, on: testDate, readinessScore: 87)
+        #expect(decision.choiceGoalIDs.count == 2)
+        #expect(decision.rankings.allSatisfy { $0.completedDays == 0 })
+    }
+
+    private var shadowCandidates: [GoalDailyShadowPolicy.Candidate] {
+        [
+            .init(goalID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, discipline: .running, isPrimary: true, blocker: nil),
+            .init(goalID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, discipline: .strength, isPrimary: true, blocker: nil)
+        ]
+    }
+
+    @Test func unscheduledRecommendationDoesNotClaimAPlanExists() {
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: nil,
+            profile: profile([(.running, .primary, 3)]),
+            recentCompletedWorkouts: [], readinessScore: 87,
+            schedulingContext: context(on: testDate)
+        )
+        #expect(recommendation.detail == "Your readiness supports training today.")
+        #expect(recommendation.schedulingReason == .profileFrequency)
+    }
+
+    @Test func scheduledRecommendationKeepsPlanSpecificGuidance() {
+        let planned = workout(type: .easyRun, date: testDate, title: "Scheduled easy run", isCompleted: false)
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: planned,
+            profile: profile([(.running, .primary, 3)]),
+            recentCompletedWorkouts: [], readinessScore: 87,
+            schedulingContext: context(on: testDate)
+        )
+        #expect(recommendation.detail == "Your readiness supports the planned training.")
+        #expect(recommendation.title == planned.title)
+        #expect(recommendation.adjustment == .keepPlan)
+    }
+
+    @Test func explanationPreservesMissingReadinessWithoutInventingAScore() {
+        let explanation = TodayRecommendationExplanation.evaluate(
+            date: testDate, profile: profile([(.strength, .primary, 2)]),
+            plannedWorkout: nil, planWorkouts: [], activities: [], readinessScore: nil
+        )
+        #expect(explanation.readinessScore == nil)
+        #expect(explanation.recommendation.directive == .unknown)
+        #expect(explanation.didRankAlternatives)
+        #expect(explanation.evaluatedAt == testDate)
+        #expect(explanation.completedWorkouts.isEmpty)
+    }
+
+    @Test func explanationSeparatesCompletedMissedAndFutureSessions() {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: testDate)!
+        let earlier = calendar.date(byAdding: .day, value: -2, to: testDate)!
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: testDate)!
+        let completed = workout(type: .easyRun, date: earlier, title: "Finished run")
+        let missed = workout(type: .longRun, date: yesterday, title: "Missed run", isCompleted: false)
+        let future = workout(type: .longRun, date: tomorrow, title: "Upcoming run", isCompleted: false)
+        let explanation = TodayRecommendationExplanation.evaluate(
+            date: testDate, profile: profile([(.running, .primary, 3), (.strength, .primary, 2)]),
+            plannedWorkout: nil, planWorkouts: [completed, missed, future],
+            activities: [], readinessScore: 82
+        )
+        #expect(explanation.completedWorkouts.map(\.id) == [completed.id])
+        #expect(explanation.reservedFutureSessionCount == 1)
+        #expect(explanation.nextPlannedWorkout == .longRun)
+        #expect(explanation.readinessScore == 82)
+        #expect(explanation.recommendation.workoutType != .fullBody)
+    }
+
+    @Test func explanationDoesNotClaimRankingWhenThePlanIsKept() {
+        let planned = workout(type: .easyRun, date: testDate, title: "Planned easy run", isCompleted: false)
+        let explanation = TodayRecommendationExplanation.evaluate(
+            date: testDate, profile: profile([(.running, .primary, 3)]),
+            plannedWorkout: planned, planWorkouts: [planned], activities: [], readinessScore: 82
+        )
+        #expect(!explanation.didRankAlternatives)
+        #expect(explanation.recommendation.title == planned.title)
+        #expect(explanation.recommendation.schedulingReason == .requiredPrimary)
+        #expect(explanation.reservedFutureSessionCount == 0)
+    }
+
+    @Test func explanationKeepsLowReadinessAttachedToItsRecoveryDecision() {
+        let explanation = TodayRecommendationExplanation.evaluate(
+            date: testDate, profile: profile([(.running, .primary, 3), (.mobility, .supporting, 1)]),
+            plannedWorkout: nil, planWorkouts: [], activities: [], readinessScore: 35
+        )
+        #expect(explanation.readinessScore == 35)
+        #expect(explanation.recommendation.directive == .recover)
+        #expect(explanation.recommendation.workoutType?.activity == .mobility)
+        #expect(explanation.didRankAlternatives)
+    }
+
+    @Test func recordedSportWinsOverConflictingActivityNames() {
+        let cases: [(String, String, WorkoutType)] = [
+            ("Ride", "Run recovery ride", .cycling),
+            ("Swim", "Long run recovery", .swimming),
+            ("WeightTraining", "Run strength session", .strengthTraining),
+            ("Walk", "Long run route preview", .walking),
+            ("Hike", "Run trail scouting", .hiking),
+            ("Yoga", "Run recovery flow", .yoga),
+            ("Run", "Bike path workout", .easyRun)
+        ]
+        for (type, name, expected) in cases {
+            let built = contextForRecordedActivity(type: type, name: name)
+            #expect(built.recentCompletedWorkouts.count == 1)
+            #expect(built.schedulingContext.previousWorkout == expected)
+            #expect(built.schedulingContext.assignedWorkoutTypes == [expected])
+        }
+    }
+
+    @Test func unknownActivityTypesDoNotInferWorkloadFromNames() {
+        let types: [String?] = [nil, "", "Workout", "Crossfit", "Other", "RunAnalysis", "WalkingTourVideo"]
+        for type in types {
+            let built = contextForRecordedActivity(type: type, name: "Long run and weight training")
+            #expect(built.recentCompletedWorkouts.isEmpty)
+            #expect(built.schedulingContext.previousWorkout == nil)
+            #expect(built.schedulingContext.assignedWorkoutTypes.isEmpty)
+        }
+    }
+
+    @Test func supportedRecordedTypeAliasesDoNotNeedDescriptiveNames() {
+        let cases: [(String, WorkoutType)] = [
+            ("Run", .easyRun), ("Running", .easyRun), ("TrailRun", .easyRun),
+            ("TrailRunning", .easyRun), ("VirtualRun", .easyRun),
+            ("Treadmill", .easyRun), ("TreadmillRun", .easyRun), ("Jogging", .easyRun),
+            ("Ride", .cycling), ("VirtualRide", .cycling), ("EBikeRide", .cycling),
+            ("MountainBikeRide", .cycling), ("GravelRide", .cycling),
+            ("Cycling", .cycling), ("IndoorCycling", .cycling),
+            ("Swim", .swimming), ("Swimming", .swimming),
+            ("Walk", .walking), ("Walking", .walking), ("Hike", .hiking),
+            ("Hiking", .hiking), ("Yoga", .yoga), ("Mobility", .stretchMobility),
+            ("Stretching", .stretchMobility), ("WeightTraining", .strengthTraining),
+            ("StrengthTraining", .strengthTraining),
+            ("FunctionalStrengthTraining", .strengthTraining),
+            ("TraditionalStrengthTraining", .strengthTraining),
+            ("  trail_running  ", .easyRun), ("weight-training", .strengthTraining)
+        ]
+        for (type, expected) in cases {
+            let built = contextForRecordedActivity(type: type, name: "Morning session")
+            #expect(built.recentCompletedWorkouts.first?.workoutType == expected)
+        }
+    }
+
+    @Test func longRunNameRefinesOnlyConfirmedRunningActivity() {
+        let built = contextForRecordedActivity(type: "Run", name: "Sunday Long Run")
+        #expect(built.recentCompletedWorkouts.first?.workoutType == .longRun)
+        #expect(built.schedulingContext.previousWorkout == .longRun)
+    }
+
+    private func contextForRecordedActivity(type: String?, name: String) -> TodayRecommendationContext {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: testDate)!
+        let activity = Activity(
+            id: 8_001, name: name, type: type, distance: 5_000,
+            elapsed_time: 1_800, activity_date: yesterday.timeIntervalSince1970
+        )
+        return TodayRecommendationContextBuilder.build(
+            date: testDate,
+            profile: profile([(.running, .primary, 3), (.strength, .primary, 2)]),
+            plannedWorkout: nil, planWorkouts: [], activities: [activity], readinessScore: 82
+        )
+    }
+
+    @Test func missedLongRunDoesNotCreateRecoveryLoad() {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: testDate)!
+        let activeProfile = profile([(.running, .primary, 3), (.strength, .primary, 2)])
+        let missed = workout(type: .longRun, date: yesterday, title: "Missed long run", isCompleted: false)
+        let built = TodayRecommendationContextBuilder.build(
+            date: testDate, profile: activeProfile, plannedWorkout: nil,
+            planWorkouts: [missed], activities: [], readinessScore: 82
+        )
+
+        #expect(built.recentCompletedWorkouts.isEmpty)
+        #expect(built.schedulingContext.previousWorkout == nil)
+        #expect(built.schedulingContext.assignedWorkoutTypes.isEmpty)
+        #expect(ComplementarySchedulingPolicy.evaluation(
+            of: .fullBody, for: built.schedulingContext
+        ).rejectionReason == nil)
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: nil, profile: activeProfile,
+            recentCompletedWorkouts: built.recentCompletedWorkouts,
+            readinessScore: 82, schedulingContext: built.schedulingContext
+        )
+        #expect(recommendation.schedulingReason != .preservesLegRecovery)
+    }
+
+    @Test func twoIdleDaysDoNotSatisfyTrainingFrequency() {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: testDate)!
+        let twoDaysAgo = calendar.date(byAdding: .day, value: -2, to: testDate)!
+        let activeProfile = profile([(.strength, .primary, 2)])
+        let missed = [
+            workout(type: .fullBody, date: twoDaysAgo, title: "Missed strength", isCompleted: false),
+            workout(type: .upperBody, date: yesterday, title: "Missed strength", isCompleted: false)
+        ]
+        let built = TodayRecommendationContextBuilder.build(
+            date: testDate, profile: activeProfile, plannedWorkout: nil,
+            planWorkouts: missed, activities: [], readinessScore: 82
+        )
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: nil, profile: activeProfile,
+            recentCompletedWorkouts: built.recentCompletedWorkouts,
+            readinessScore: 82, schedulingContext: built.schedulingContext
+        )
+
+        #expect(built.recentCompletedWorkouts.isEmpty)
+        #expect(built.schedulingContext.assignedWorkoutTypes.isEmpty)
+        #expect(recommendation.workoutType?.isStrength == true)
+        #expect(recommendation.schedulingReason == .profileFrequency)
+    }
+
+    @Test func futureLongRunStillConstrainsStrengthWithoutBecomingCompletedLoad() {
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: testDate)!
+        let planned = workout(type: .longRun, date: tomorrow, title: "Upcoming long run", isCompleted: false)
+        let built = TodayRecommendationContextBuilder.build(
+            date: testDate,
+            profile: profile([(.running, .primary, 3), (.strength, .primary, 2)]),
+            plannedWorkout: nil, planWorkouts: [planned], activities: [], readinessScore: 82
+        )
+
+        #expect(built.recentCompletedWorkouts.isEmpty)
+        #expect(built.schedulingContext.previousWorkout == nil)
+        #expect(built.schedulingContext.nextWorkout == .longRun)
+        #expect(built.schedulingContext.assignedWorkoutTypes == [.longRun])
+        #expect(ComplementarySchedulingPolicy.evaluation(
+            of: .fullBody, for: built.schedulingContext
+        ).rejectionReason == .lowerBodyRecoveryConflict)
+    }
+
+    @Test func completedLongRunStillCreatesRecoveryContext() {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: testDate)!
+        let completed = workout(type: .longRun, date: yesterday, title: "Completed long run")
+        let built = TodayRecommendationContextBuilder.build(
+            date: testDate,
+            profile: profile([(.running, .primary, 3), (.strength, .primary, 2)]),
+            plannedWorkout: nil, planWorkouts: [completed], activities: [], readinessScore: 82
+        )
+
+        #expect(built.recentCompletedWorkouts.count == 1)
+        #expect(built.schedulingContext.previousWorkout == .longRun)
+        #expect(built.schedulingContext.assignedWorkoutTypes == [.longRun])
+        #expect(ComplementarySchedulingPolicy.evaluation(
+            of: .fullBody, for: built.schedulingContext
+        ).rejectionReason == .lowerBodyRecoveryConflict)
+    }
+
+    @Test func recommendationDoesNotUseUnsubstantiatedPreviousSchedulingSlot() {
+        let activeProfile = profile([(.strength, .primary, 2)])
+        let staleContext = SchedulingDayContext(
+            date: testDate, weekday: DayOfWeek.from(date: testDate), profile: activeProfile,
+            plannedOrFixedWorkout: nil, previousWorkout: .longRun, nextWorkout: nil,
+            readiness: .normal, assignedWorkoutTypes: [], isCompletedProtected: false,
+            isUnavailable: false, isTaperProtected: false
+        )
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: nil, profile: activeProfile, recentCompletedWorkouts: [],
+            readinessScore: 82, schedulingContext: staleContext
+        )
+
+        #expect(recommendation.workoutType?.isStrength == true)
+        #expect(recommendation.schedulingReason == .profileFrequency)
+    }
+
     @Test func poorReadinessRecommendsRecovery() {
         let recommendation = TodayRecommendationPolicy.recommendation(readinessScore: 29)
 
@@ -737,7 +1417,8 @@ struct TodayRecommendationPolicyTests {
         type: WorkoutType,
         date: Date,
         title: String,
-        completedActivityId: Int? = nil
+        completedActivityId: Int? = nil,
+        isCompleted: Bool = true
     ) -> DailyWorkout {
         DailyWorkout(
             id: "\(type.rawValue)-\(date.timeIntervalSince1970)",
@@ -750,7 +1431,7 @@ struct TodayRecommendationPolicyTests {
             distance: type.isRunning ? 5 : nil,
             targetPace: type.isRunning ? "Conversational effort" : nil,
             exercises: nil,
-            isCompleted: true,
+            isCompleted: isCompleted,
             completedActivityId: completedActivityId
         )
     }
@@ -832,5 +1513,426 @@ struct TodayRecommendationPolicyTests {
             ),
             today
         )
+    }
+}
+
+extension TodayRecommendationPolicyTests {
+    @Test func numericProgressionRepeatsOneCompletedStrengthSession() {
+        let result = sessionResultFixture()
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result], on: result.recordedAt, availableSeconds: 1800)
+        #expect(proposal.items.first?.repetitions == 8)
+        #expect(proposal.items.first?.loadKilograms == 45)
+        #expect(proposal.hasIncrease == false)
+    }
+
+    @Test func numericProgressionRequiresEquipmentIncrementAtRepCeiling() {
+        let result = sessionResultFixture()
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result, earlierSessionResult(result, days: 3)], on: result.recordedAt, availableSeconds: 1800)
+        #expect(proposal.items.first?.loadKilograms == 45)
+        #expect(proposal.needsEquipmentIncrement)
+    }
+
+    @Test func numericProgressionUsesExplicitIncrementAndResetsReps() {
+        let result = sessionResultFixture()
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result, earlierSessionResult(result, days: 3)], on: result.recordedAt, availableSeconds: 1800, incrementsKilograms: ["barbell-bench-press": 2])
+        #expect(proposal.items.first?.loadKilograms == 47)
+        #expect(proposal.items.first?.repetitions == 6)
+        #expect(proposal.hasIncrease)
+    }
+
+    @Test func numericProgressionRejectsLargeOrInvalidIncrements() {
+        let result = sessionResultFixture()
+        for increment in [Double.nan, Double.infinity, -2, 0, 10] {
+            let proposal = SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result, earlierSessionResult(result, days: 3)], on: result.recordedAt, availableSeconds: 1800, incrementsKilograms: ["barbell-bench-press": increment])
+            #expect(proposal.items.first?.loadKilograms == 45)
+            #expect(!proposal.hasIncrease)
+        }
+    }
+
+    @Test func numericProgressionAddsRepOnlyAfterMatchingCompletedDays() {
+        var result = sessionResultFixture()
+        result.entries[0].repetitions = 6
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result, earlierSessionResult(result, days: 3)], on: result.recordedAt, availableSeconds: 1800)
+        #expect(proposal.items.first?.repetitions == 7)
+        #expect(proposal.items.first?.loadKilograms == 45)
+    }
+
+    @Test func numericProgressionBlocksPartialHardStaleAndWrongOwner() {
+        var result = sessionResultFixture()
+        result.entries[0].repetitions = 4
+        #expect(SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result], on: result.recordedAt, availableSeconds: 1800).items.isEmpty)
+        result.entries[0].repetitions = 8
+        result.perceivedEffort = 9
+        #expect(SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result], on: result.recordedAt, availableSeconds: 1800).items.isEmpty)
+        result.perceivedEffort = 5
+        #expect(SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result], on: result.recordedAt.addingTimeInterval(40 * 86400), availableSeconds: 1800).items.isEmpty)
+        #expect(SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 43, results: [result], on: result.recordedAt, availableSeconds: 1800).items.isEmpty)
+    }
+
+    @Test func numericProgressionRequiresFullTimeBudget() {
+        let result = sessionResultFixture()
+        #expect(SessionProgressionProposalPolicy.propose(goalID: result.reference.goalID, athleteID: 42, results: [result], on: result.recordedAt, availableSeconds: 899).items.isEmpty)
+    }
+
+    @Test func numericProgressionConvertsPoundsWithoutRelabeling() {
+        #expect(abs(SessionProgressionProposalPolicy.kilograms(5, unit: .pounds) - 2.26796185) < 0.000001)
+        #expect(abs(SessionProgressionProposalPolicy.displayMass(45, unit: .pounds) - 99.20801798) < 0.00001)
+        #expect(SessionProgressionProposalPolicy.kilograms(5, unit: .kilograms) == 5)
+    }
+
+    @Test func numericRunningProposalRepeatsActualBlocksWithoutInventingPace() {
+        let strength = sessionResultFixture()
+        let item = TrainingSessionResult.Item(id: "run/0", title: "Easy run", kind: .running, exerciseID: nil, seconds: 1200, repetitions: nil, convention: nil, loadKilograms: nil, assistanceKilograms: nil)
+        let reference = TrainingSessionResult.Reference(athleteID: 42, goalID: strength.reference.goalID, goalTitle: "Running", fingerprint: "run", policyVersion: "test", generatedAt: strength.recordedAt, distanceUnit: .miles, massUnit: .pounds, prescribedSeconds: 1200, items: [item])
+        let entry = TrainingSessionResult.Entry(itemID: item.id, skipped: false, seconds: 1230, repetitions: nil, loadKilograms: nil, assistanceKilograms: nil, repsInReserve: nil)
+        let result = TrainingSessionResult(id: UUID(), reference: reference, completedAt: strength.completedAt, recordedAt: strength.recordedAt, elapsedSeconds: 1230, perceivedEffort: 4, bodyState: .good, entries: [entry])
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: reference.goalID, athleteID: 42, results: [result], on: result.recordedAt, availableSeconds: 1800)
+        #expect(proposal.items.first?.seconds == 1230)
+        #expect(proposal.requiredSeconds == 1230)
+        #expect(!proposal.hasIncrease)
+    }
+}
+
+extension TodayRecommendationPolicyTests {
+    private func acceptanceFixture() -> (WeeklyTrainingPlan, TrainingSessionResult, SessionProgressionProposalPolicy.Proposal, Date, Date) {
+        let source = sessionResultFixture()
+        let now = Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 13, hour: 12))!
+        let start = Calendar.current.startOfDay(for: now)
+        let target = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        let end = Calendar.current.date(byAdding: .day, value: 6, to: start)!
+        let workout = DailyWorkout(id: "monday", date: target, dayOfWeek: .from(date: target), workoutType: .easyRun, title: "Original run", description: "Planned", duration: 30, distance: 3, targetPace: nil, exercises: nil, isCompleted: false, completedActivityId: nil)
+        let plan = WeeklyTrainingPlan(id: "acceptance", athleteId: 42, weekStartDate: start, weekEndDate: end, workouts: [workout], weekNumber: nil, totalMileage: 3, focusArea: nil, notes: nil, generatedAt: now, goalId: nil)
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: source.reference.goalID, athleteID: 42, results: [source], on: now, availableSeconds: 1800)
+        return (plan, source, proposal, now, target)
+    }
+
+    @Test func acceptedPrescriptionRetainsExactDoseAndUnits() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let updated = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let workout = try #require(updated.workouts.first)
+        #expect(workout.acceptedPrescription?.items.first?.loadKilograms == 45)
+        #expect(workout.acceptedPrescription?.massUnit == .pounds)
+        #expect(workout.exercises?.first?.sets == 1)
+        #expect(workout.distance == nil)
+        #expect(updated.totalMileage == 0)
+        let decoded = try JSONDecoder().decode(WeeklyTrainingPlan.self, from: JSONEncoder().encode(updated))
+        #expect(decoded.workouts.first?.acceptedPrescription == workout.acceptedPrescription)
+    }
+
+    @Test func acceptedPrescriptionRejectsCompletedOrPastDay() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: now, now: now)
+        }
+        let original = plan.workouts[0]
+        let completed = DailyWorkout(id: original.id, date: target, dayOfWeek: original.dayOfWeek, workoutType: original.workoutType, title: original.title, description: original.description, duration: original.duration, distance: original.distance, targetPace: nil, exercises: nil, isCompleted: true, completedActivityId: 12)
+        let protected = AcceptedPrescriptionPlanPolicy.replacingWorkouts(in: plan, with: [completed], generatedAt: now)
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: protected, on: target, now: now)
+        }
+    }
+
+    @Test func acceptedPrescriptionRejectsWrongOwnerAndEmptyProposal() {
+        let (plan, source, _, now, target) = acceptanceFixture()
+        let empty = SessionProgressionProposalPolicy.Proposal(reason: "No evidence")
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionPlanPolicy.placing(empty, source: source.reference, in: plan, on: target, now: now)
+        }
+        let other = WeeklyTrainingPlan(id: plan.id, athleteId: 43, weekStartDate: plan.weekStartDate, weekEndDate: plan.weekEndDate, workouts: plan.workouts, weekNumber: nil, totalMileage: 3, focusArea: nil, notes: nil, generatedAt: now, goalId: nil)
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: source.reference.goalID, athleteID: 42, results: [source], on: now, availableSeconds: 1800)
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: other, on: target, now: now)
+        }
+    }
+
+    @Test func acceptedReceiptRejectsUndoAfterNewerEdit() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let after = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let receipt = try AcceptedPrescriptionPlanReceipt(before: plan, after: after, acceptedAt: now)
+        #expect(try receipt.restoredPlan(current: after, athleteID: 42).workouts.first?.title == "Original run")
+        let changed = AcceptedPrescriptionPlanPolicy.replacingWorkouts(in: after, with: [], generatedAt: now)
+        #expect(throws: (any Error).self) { try receipt.restoredPlan(current: changed, athleteID: 42) }
+        #expect(throws: (any Error).self) { try receipt.restoredPlan(current: after, athleteID: 43) }
+    }
+
+    @Test func acceptedReceiptFingerprintSurvivesCacheDateEncoding() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let after = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let reloaded = try decoder.decode(WeeklyTrainingPlan.self, from: encoder.encode(after))
+        #expect(try AcceptedPrescriptionPlanPolicy.fingerprint(after) == AcceptedPrescriptionPlanPolicy.fingerprint(reloaded))
+    }
+
+    @Test func acceptedRegenerationCannotDropExplicitChoice() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        #expect(AcceptedPrescriptionPlanPolicy.isExplicitChoice(placed.workouts[0]))
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionPlanPolicy.validateRegenerated(before: placed, after: plan, targetDate: target, availability: [], now: now)
+        }
+    }
+}
+
+extension TodayRecommendationPolicyTests {
+    @Test func acceptedStrengthUsesPrescriptionEffortRatherThanGenericZone() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        #expect(WorkoutEffortDisplayPolicy.zoneTarget(for: workout) == nil)
+        #expect(WorkoutEffortDisplayPolicy.acceptedEffort(for: workout)?.title == "Prescribed reps and load")
+    }
+
+    @Test func acceptedRunningDoesNotAcquireAHeartRateZone() throws {
+        let (plan, _, _, now, target) = acceptanceFixture()
+        let item = TrainingSessionResult.Item(id: "run", title: "Easy running", kind: .running, exerciseID: nil, seconds: 1200, repetitions: nil, convention: nil, loadKilograms: nil, assistanceKilograms: nil)
+        let reference = TrainingSessionResult.Reference(athleteID: plan.athleteId, goalID: UUID(), goalTitle: "Running goal", fingerprint: "effort-display", policyVersion: "test", generatedAt: now.addingTimeInterval(-86400), distanceUnit: .miles, massUnit: .pounds, prescribedSeconds: 1200, items: [item])
+        let entry = TrainingSessionResult.Entry(itemID: item.id, skipped: false, seconds: 1200, repetitions: nil, loadKilograms: nil, assistanceKilograms: nil, repsInReserve: nil)
+        let result = TrainingSessionResult(id: UUID(), reference: reference, completedAt: now.addingTimeInterval(-86400), recordedAt: now.addingTimeInterval(-86400), elapsedSeconds: 1200, perceivedEffort: 4, bodyState: .good, entries: [entry])
+        let proposal = SessionProgressionProposalPolicy.propose(goalID: reference.goalID, athleteID: plan.athleteId, results: [result], on: now, availableSeconds: 1800)
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: reference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        #expect(WorkoutEffortDisplayPolicy.zoneTarget(for: workout) == nil)
+        #expect(WorkoutEffortDisplayPolicy.acceptedEffort(for: workout)?.title == "Conversational effort")
+        #expect(workout.acceptedPrescription?.items.first?.seconds == 1200)
+    }
+
+    @Test func existingWorkoutZonePresentationIsUnchanged() {
+        let (plan, _, _, _, _) = acceptanceFixture()
+        let workout = plan.workouts[0]
+        #expect(WorkoutEffortDisplayPolicy.zoneTarget(for: workout)?.label == NativeTrainingGuidancePolicy.zoneTarget(for: workout.workoutType)?.label)
+        #expect(WorkoutEffortDisplayPolicy.acceptedEffort(for: workout) == nil)
+    }
+
+    @Test @MainActor func acceptanceLoadsOwnedCachedPlanWithoutOpeningPlanTab() async throws {
+        let fixture = makePlan()
+        let manager = DataManager.shared
+        let previous = manager.currentWeeklyPlan
+        let previousPending = manager.pendingNextWeekPlan
+        let suite = "acceptance-cold-load-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { manager.currentWeeklyPlan = previous; manager.pendingNextWeekPlan = previousPending; defaults.removePersistentDomain(forName: suite) }
+        let profile = TrainingProfile.runningFirstDefault
+        try TrainingPlanService.cachePlan(fixture.plan, profile: profile, defaults: defaults)
+        manager.currentWeeklyPlan = nil
+        let loaded = await manager.loadPlanForPrescriptionAcceptance(athleteID: fixture.plan.athleteId, profile: profile, defaults: defaults, activeAthleteID: { fixture.plan.athleteId })
+        #expect(loaded)
+        #expect(manager.currentWeeklyPlan?.id == fixture.plan.id)
+    }
+
+    @Test @MainActor func acceptanceDoesNotLoadAnotherAccountsCache() async throws {
+        let fixture = makePlan()
+        let manager = DataManager.shared
+        let previous = manager.currentWeeklyPlan
+        let previousPending = manager.pendingNextWeekPlan
+        let suite = "acceptance-other-owner-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { manager.currentWeeklyPlan = previous; manager.pendingNextWeekPlan = previousPending; defaults.removePersistentDomain(forName: suite) }
+        let profile = TrainingProfile.runningFirstDefault
+        try TrainingPlanService.cachePlan(fixture.plan, profile: profile, defaults: defaults)
+        manager.currentWeeklyPlan = nil
+        let other = fixture.plan.athleteId + 1
+        let loaded = await manager.loadPlanForPrescriptionAcceptance(athleteID: other, profile: profile, defaults: defaults, activeAthleteID: { other })
+        #expect(!loaded)
+        #expect(manager.currentWeeklyPlan == nil)
+    }
+
+    @Test @MainActor func acceptancePromotesOwnedPendingPlanWhenItsWeekArrives() async throws {
+        let fixture = makePlan()
+        let manager = DataManager.shared
+        let previous = manager.currentWeeklyPlan
+        let previousPending = manager.pendingNextWeekPlan
+        let suite = "acceptance-pending-load-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { manager.currentWeeklyPlan = previous; manager.pendingNextWeekPlan = previousPending; defaults.removePersistentDomain(forName: suite) }
+        let profile = TrainingProfile.runningFirstDefault
+        try TrainingPlanService.cachePendingNextWeekPlan(fixture.plan, profile: profile, defaults: defaults)
+        manager.currentWeeklyPlan = nil
+        let loaded = await manager.loadPlanForPrescriptionAcceptance(athleteID: fixture.plan.athleteId, profile: profile, defaults: defaults, activeAthleteID: { fixture.plan.athleteId })
+        #expect(loaded)
+        #expect(manager.currentWeeklyPlan?.id == fixture.plan.id)
+        #expect(defaults.data(forKey: TrainingPlanService.pendingNextWeekCacheKey) == nil)
+    }
+
+    @Test @MainActor func acceptanceMissingCacheDoesNotGenerateAPlan() async throws {
+        let manager = DataManager.shared
+        let previous = manager.currentWeeklyPlan
+        let suite = "acceptance-missing-load-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { manager.currentWeeklyPlan = previous; defaults.removePersistentDomain(forName: suite) }
+        manager.currentWeeklyPlan = nil
+        let loaded = await manager.loadPlanForPrescriptionAcceptance(athleteID: 42, profile: .runningFirstDefault, defaults: defaults, activeAthleteID: { 42 })
+        #expect(!loaded)
+        #expect(manager.currentWeeklyPlan == nil)
+        #expect(defaults.data(forKey: TrainingPlanService.cacheKey) == nil)
+    }
+}
+
+extension TodayRecommendationPolicyTests {
+    @Test func acceptedCompletionUsesProposedDoseAndKeepsProgressionRange() throws {
+        let (plan, source, initial, now, target) = acceptanceFixture()
+        var proposal = initial
+        proposal.items[0].repetitions = 6
+        proposal.items[0].loadKilograms = 47
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        let reference = try AcceptedPrescriptionCompletionPolicy.reference(for: workout, athleteID: 42)
+        #expect(reference.items[0].prescribedRepetitions == 6)
+        #expect(reference.items[0].repetitions == 6...8)
+        #expect(reference.items[0].loadKilograms == 47)
+        #expect(reference.massUnit == .pounds)
+        #expect(reference.distanceUnit == .miles)
+        #expect(reference.acceptedPrescriptionID == workout.acceptedPrescription?.id)
+        #expect(reference.id != source.reference.id)
+        #expect(try AcceptedPrescriptionCompletionPolicy.reference(for: workout, athleteID: 42) == reference)
+        #expect(try JSONDecoder().decode(TrainingSessionResult.Reference.self, from: JSONEncoder().encode(reference)) == reference)
+        #expect(AcceptedPrescriptionCompletionPolicy.effortLabel(for: workout) == "Prescribed")
+        #expect(AcceptedPrescriptionCompletionPolicy.effortLabel(for: plan.workouts[0]) == nil)
+    }
+
+    @Test func acceptedCompletionPreservesFractionalRunningSeconds() throws {
+        let (plan, source, _, now, target) = acceptanceFixture()
+        let item = TrainingSessionResult.Item(id: "running/0", title: "Easy run", kind: .running,
+            exerciseID: nil, seconds: 600, repetitions: nil, convention: nil,
+            loadKilograms: nil, assistanceKilograms: nil)
+        var oldReference = source.reference
+        oldReference.items = [item]
+        let entry = TrainingSessionResult.Entry(itemID: item.id, skipped: false, seconds: 610.5,
+            repetitions: nil, loadKilograms: nil, assistanceKilograms: nil, repsInReserve: nil)
+        let proposal = SessionProgressionProposalPolicy.Proposal(items: [.init(id: item.id, title: item.title,
+            kind: .running, convention: nil, previous: entry, seconds: 610.5, repetitions: nil,
+            loadKilograms: nil, assistanceKilograms: nil)], requiredSeconds: 900, evidenceIDs: [source.id], reason: "Repeat")
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: oldReference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        let reference = try AcceptedPrescriptionCompletionPolicy.reference(for: workout, athleteID: 42)
+        #expect(reference.items[0].durationSeconds == 610.5)
+        #expect(reference.items[0].seconds == nil)
+        #expect(AcceptedPrescriptionCompletionPolicy.effortLabel(for: workout) == "Conversational")
+        var result = source
+        result.reference = reference
+        result.entries = [entry]
+        result.completedAt = target.addingTimeInterval(3600)
+        #expect(!result.isPartial)
+        result.entries[0].seconds = 610
+        #expect(result.isPartial)
+    }
+
+    @Test func acceptedCompletionRejectsWrongOwnerAndMalformedDose() throws {
+        let (plan, source, initial, now, target) = acceptanceFixture()
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(initial, source: source.reference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        #expect(throws: (any Error).self) { try AcceptedPrescriptionCompletionPolicy.reference(for: workout, athleteID: 43) }
+        var invalid = initial
+        invalid.items[0].repetitions = nil
+        let malformed = try AcceptedPrescriptionPlanPolicy.placing(invalid, source: source.reference, in: plan, on: target, now: now)
+        #expect(throws: (any Error).self) { try AcceptedPrescriptionCompletionPolicy.reference(for: malformed.workouts[0], athleteID: 42) }
+    }
+
+    @MainActor @Test func acceptedCompletionStoresExactRecordAndRejectsDuplicateAndStalePlan() throws {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let workout = try #require(placed.workouts.first)
+        let reference = try AcceptedPrescriptionCompletionPolicy.reference(for: workout, athleteID: 42)
+        let completed = target.addingTimeInterval(3600)
+        let result = TrainingSessionResult(id: UUID(), reference: reference, completedAt: completed,
+            recordedAt: completed, elapsedSeconds: source.elapsedSeconds, perceivedEffort: 5,
+            bodyState: .good, entries: source.entries)
+        try AcceptedPrescriptionCompletionPolicy.validate(result, workout: workout, currentPlan: placed, athleteID: 42, now: completed)
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionCompletionPolicy.validate(result, workout: workout, currentPlan: plan, athleteID: 42, now: completed)
+        }
+        #expect(throws: (any Error).self) {
+            try AcceptedPrescriptionCompletionPolicy.validate(result, workout: workout, currentPlan: placed, athleteID: 42, now: now)
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = ProtectedTrainingRepository(root: root, activeAthleteID: { 42 })
+        try repository.appendSessionResult(source, athleteID: 42)
+        try repository.appendSessionResult(result, athleteID: 42)
+        #expect(try repository.sessionResults(athleteID: 42).contains(result))
+        var duplicate = result
+        duplicate.id = UUID()
+        #expect(throws: (any Error).self) { try repository.appendSessionResult(duplicate, athleteID: 42) }
+        #expect(try repository.sessionResults(athleteID: 42).count == 2)
+    }
+
+    @Test func acceptedCompletionUsesExactRepTargetForPartialWork() throws {
+        let (plan, source, initial, now, target) = acceptanceFixture()
+        var proposal = initial
+        proposal.items[0].repetitions = 7
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        var result = source
+        result.reference = try AcceptedPrescriptionCompletionPolicy.reference(for: placed.workouts[0], athleteID: 42)
+        result.entries[0].repetitions = 6
+        #expect(result.isPartial)
+        result.entries[0].repetitions = 7
+        #expect(!result.isPartial)
+    }
+}
+
+extension TodayRecommendationPolicyTests {
+    private func completionStatusFixture(partial: Bool = false) throws -> (WeeklyTrainingPlan, TrainingSessionResult) {
+        let (plan, source, proposal, now, target) = acceptanceFixture()
+        let placed = try AcceptedPrescriptionPlanPolicy.placing(proposal, source: source.reference, in: plan, on: target, now: now)
+        let reference = try AcceptedPrescriptionCompletionPolicy.reference(for: placed.workouts[0], athleteID: 42)
+        var entries = source.entries
+        if partial { entries[0].repetitions = 1 }
+        let completed = target.addingTimeInterval(3600)
+        let result = TrainingSessionResult(id: UUID(), reference: reference, completedAt: completed,
+            recordedAt: completed, elapsedSeconds: 900, perceivedEffort: 5, bodyState: .good, entries: entries)
+        return (placed, result)
+    }
+
+    @Test func acceptedFullCompletionUpdatesPlanWithoutChangingPrescriptionOrMileage() throws {
+        let (plan, result) = try completionStatusFixture()
+        let updated = try #require(try AcceptedWorkoutCompletionProjection.applying([result], to: plan))
+        #expect(updated.workouts[0].isCompleted)
+        #expect(updated.workouts[0].acceptedCompletion?.resultID == result.id)
+        #expect(updated.workouts[0].acceptedPrescription == plan.workouts[0].acceptedPrescription)
+        #expect(updated.totalMileage == plan.totalMileage)
+        #expect(updated.workouts[0].completedActivityId == nil)
+        #expect(updated.mergedWithActivities([]).filter(\.isCompleted).count == 1)
+        #expect(try AcceptedWorkoutCompletionProjection.applying([result], to: updated) == nil)
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        let restored = try decoder.decode(WeeklyTrainingPlan.self, from: encoder.encode(updated))
+        #expect(restored.workouts[0].acceptedCompletion == updated.workouts[0].acceptedCompletion)
+    }
+
+    @Test func acceptedPartialCompletionIsNotClaimedAsFullWorkout() throws {
+        let (plan, result) = try completionStatusFixture(partial: true)
+        let updated = try #require(try AcceptedWorkoutCompletionProjection.applying([result], to: plan))
+        #expect(!updated.workouts[0].isCompleted)
+        #expect(updated.workouts[0].acceptedCompletion?.status == "Partial session")
+        let entry = try #require(updated.mergedWithActivities([]).first { $0.plannedWorkout?.acceptedCompletion != nil })
+        #expect(entry.statusText == "Partial session")
+        #expect(!entry.isCompleted)
+        #expect(entry.displayDuration == 15)
+    }
+
+    @Test func completionProjectionRejectsWrongOwnerAndDuplicateRecords() throws {
+        let (plan, result) = try completionStatusFixture()
+        #expect(throws: (any Error).self) { try AcceptedWorkoutCompletionProjection.applying([result, result], to: plan) }
+        let other = WeeklyTrainingPlan(id: plan.id, athleteId: 43, weekStartDate: plan.weekStartDate,
+            weekEndDate: plan.weekEndDate, workouts: plan.workouts, weekNumber: nil, totalMileage: 0,
+            focusArea: nil, notes: nil, generatedAt: plan.generatedAt, goalId: nil)
+        #expect(throws: (any Error).self) { try AcceptedWorkoutCompletionProjection.applying([result], to: other) }
+        #expect(try AcceptedWorkoutCompletionProjection.applying([], to: plan) == nil)
+    }
+
+    @Test func completionAndSyncedActivityDoNotCountTwiceInWeekOrContext() throws {
+        let (plan, result) = try completionStatusFixture()
+        let updated = try #require(try AcceptedWorkoutCompletionProjection.applying([result], to: plan))
+        let activity = Activity(id: 80808, name: "Strength", type: "WeightTraining",
+            distance: 0, start_date: result.completedAt.timeIntervalSince1970,
+            elapsed_time: 900, athlete_id: 42, activity_date: result.completedAt.timeIntervalSince1970)
+        #expect(updated.mergedWithActivities([activity]).filter(\.isCompleted).count == 1)
+        let context = TodayRecommendationContextBuilder.build(date: result.completedAt.addingTimeInterval(86400),
+            profile: .runningFirstDefault, plannedWorkout: nil, planWorkouts: updated.workouts,
+            activities: [activity], readinessScore: 80)
+        #expect(context.recentCompletedWorkouts.count == 1)
+        #expect(updated.weekStats(with: [activity]).actualMiles == 0)
     }
 }

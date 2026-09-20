@@ -105,6 +105,10 @@ struct PlanView: View {
             }
         }
         .task(id: dataManager.athlete?.id) { allGoals = []; await loadAll() }
+        .onChange(of: dataManager.currentWeeklyPlan?.generatedAt) { _, _ in
+            viewModel.currentPlan = dataManager.currentWeeklyPlan
+            viewModel.displayedPlan = dataManager.currentWeeklyPlan
+        }
     }
 
     // MARK: - Load
@@ -618,7 +622,10 @@ struct TodayWorkoutCard: View {
     let actualActivity: Activity?
     let onTap: () -> Void
 
-    var isCompleted: Bool { actualActivity != nil }
+    var isCompleted: Bool {
+        if let completion = workout.acceptedCompletion { return !completion.isPartial }
+        return actualActivity != nil || workout.isCompleted
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -628,7 +635,10 @@ struct TodayWorkoutCard: View {
                         .font(AppTheme.Typography.caption)
                         .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                     Spacer()
-                    if isCompleted {
+                    if workout.acceptedCompletion?.isPartial == true {
+                        Label("Partial session", systemImage: "circle.lefthalf.filled")
+                            .font(AppTheme.Typography.caption).foregroundColor(.orange)
+                    } else if isCompleted {
                         Label("Completed", systemImage: "checkmark.circle.fill")
                             .font(AppTheme.Typography.caption)
                             .foregroundColor(.green)
@@ -1005,48 +1015,8 @@ struct LoadingPlanView: View {
 
 struct PlanWorkoutDetailSheet: View {
     let workout: DailyWorkout
-    @Environment(\.dismiss) private var dismiss
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.lg) {
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                        HStack {
-                            Image(systemName: workout.workoutType.icon).font(.system(size: 40))
-                                .foregroundColor(workout.workoutType.color)
-                            VStack(alignment: .leading) {
-                                Text(workout.title).font(AppTheme.Typography.title)
-                                    .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
-                                Text(workout.dayOfWeek.fullName).font(AppTheme.Typography.body)
-                                    .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                            }
-                        }
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                        if let d = workout.formattedDistance { DetailRow(label: "Distance", value: d) }
-                        if let dur = workout.formattedDuration { DetailRow(label: "Duration", value: dur) }
-                        if let p = workout.targetPace { DetailRow(label: "Target Pace", value: p) }
-                    }
-                    Divider()
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                        Text("Notes").font(AppTheme.Typography.headline)
-                            .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
-                        Text(workout.description).font(AppTheme.Typography.body)
-                            .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                    }
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("Workout Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
+        WorkoutDetailSheet(workout: workout)
     }
 }
 

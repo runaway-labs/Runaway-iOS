@@ -91,6 +91,8 @@ struct DailyWorkout: Codable, Identifiable {
     let exercises: [Exercise]?
     let isCompleted: Bool
     let completedActivityId: Int?
+    var acceptedPrescription: AcceptedTrainingPrescription? = nil
+    var acceptedCompletion: AcceptedWorkoutCompletion? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -105,6 +107,8 @@ struct DailyWorkout: Codable, Identifiable {
         case exercises
         case isCompleted = "is_completed"
         case completedActivityId = "completed_activity_id"
+        case acceptedPrescription = "accepted_prescription"
+        case acceptedCompletion = "accepted_completion"
     }
 
     var formattedDistance: String? {
@@ -418,7 +422,8 @@ struct WeekDayEntry: Identifiable {
 
     /// Whether this day has been completed with an actual activity
     var isCompleted: Bool {
-        actualActivity != nil
+        if let completion = plannedWorkout?.acceptedCompletion { return !completion.isPartial }
+        return actualActivity != nil || plannedWorkout?.isCompleted == true
     }
 
     /// Whether this day is in the past (and should show as missed if no activity)
@@ -460,6 +465,7 @@ struct WeekDayEntry: Identifiable {
 
     /// Display duration in minutes
     var displayDuration: Int? {
+        if let completion = plannedWorkout?.acceptedCompletion { return Int(ceil(completion.elapsedSeconds / 60)) }
         if let activity = actualActivity, let elapsed = activity.elapsed_time {
             return Int(elapsed / 60)
         }
@@ -489,6 +495,8 @@ struct WeekDayEntry: Identifiable {
 
     /// Icon for the day
     var icon: String {
+        if plannedWorkout?.acceptedCompletion?.isPartial == true { return "circle.lefthalf.filled" }
+        if isCompleted { return "checkmark.circle.fill" }
         if actualActivity != nil {
             return "checkmark.circle.fill"
         }
@@ -500,6 +508,8 @@ struct WeekDayEntry: Identifiable {
 
     /// Color for the day
     var iconColor: Color {
+        if plannedWorkout?.acceptedCompletion?.isPartial == true { return .orange }
+        if isCompleted { return .green }
         if actualActivity != nil {
             return .green
         }
@@ -511,6 +521,8 @@ struct WeekDayEntry: Identifiable {
 
     /// Status text for the day
     var statusText: String? {
+        if let completion = plannedWorkout?.acceptedCompletion { return completion.status }
+        if plannedWorkout?.isCompleted == true { return "Completed" }
         if actualActivity != nil {
             return "Completed"
         }

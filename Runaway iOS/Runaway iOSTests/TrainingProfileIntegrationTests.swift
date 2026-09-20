@@ -6,6 +6,52 @@ import Testing
 struct TrainingProfileIntegrationTests {
     private let calendar = Calendar.current
 
+    @Test func generatedDistanceCopyUsesCurrentPrescriptionWithoutRewritingIntervals() {
+        #expect(WorkoutDescriptionPolicy.reconciled(
+            "2.8 miles at conversational pace. Keep it easy.", distanceLabel: "8.8 mi"
+        ) == "8.8 mi at conversational pace. Keep it easy.")
+        #expect(WorkoutDescriptionPolicy.reconciled(
+            "Run 2 miles, then 4 x 400m.", distanceLabel: "8.8 mi"
+        ) == "Run 2 miles, then 4 x 400m.")
+    }
+
+    @Test func recommendationDetailDoesNotBorrowAnUnrelatedPlannedWorkout() throws {
+        let rest = try #require(makePlan().workouts.first { !$0.workoutType.isRunning })
+        let recommendation = TodayRecommendation(
+            directive: .proceed, status: "Ready", title: "Easy Run",
+            detail: "Keep the effort conversational.", systemImage: "figure.run", workoutType: .easyRun
+        )
+        let detail = try #require(TodayRecommendationDetailPolicy.workout(
+            recommendation: recommendation, plannedWorkout: rest, date: rest.date
+        ))
+        #expect(detail.workoutType == .easyRun)
+        #expect(detail.id != rest.id)
+        #expect(detail.distance == nil)
+        #expect(detail.duration == nil)
+        #expect(!detail.isCompleted)
+    }
+
+    @Test func recommendationDetailPreservesMatchingPlanButNotItsLoadWhenReduced() throws {
+        let run = try #require(makePlan().workouts.first { $0.workoutType == .easyRun })
+        let matching = TodayRecommendation(
+            directive: .proceed, status: "Ready", title: run.title,
+            detail: "Follow your plan.", systemImage: "figure.run", workoutType: run.workoutType
+        )
+        let detail = try #require(TodayRecommendationDetailPolicy.workout(
+            recommendation: matching, plannedWorkout: run, date: run.date
+        ))
+        expectExactlyEqual(detail, run)
+        let reduced = TodayRecommendation(
+            directive: .reduceIntensity, status: "Ease back", title: "Easy session",
+            detail: "Reduce today's effort.", systemImage: "figure.run", workoutType: run.workoutType
+        )
+        let lighter = try #require(TodayRecommendationDetailPolicy.workout(
+            recommendation: reduced, plannedWorkout: run, date: run.date
+        ))
+        #expect(lighter.distance == nil)
+        #expect(lighter.id != run.id)
+    }
+
     @Test func todayAndWeeklyCandidatePoliciesAgreeForEquivalentContext() throws {
         let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 27))!
         let yesterday = calendar.date(byAdding: .day, value: -1, to: date)!
@@ -101,13 +147,18 @@ struct TrainingProfileIntegrationTests {
     }
 
     @Test func remainingWeekPreservesEveryRunningPrescriptionIncludingFutureTaperDetails() async throws {
-        let existing = makePlan(includeCompletedValues: true)
-        let futureRun = try #require(existing.workouts.last { $0.workoutType.isRunning && $0.date > Date() })
+        let weekStart = try #require(calendar.date(from: DateComponents(year: 2026, month: 9, day: 6)))
+        let regenerationDate = try #require(calendar.date(byAdding: .day, value: 3, to: weekStart))
+        let existing = makePlan(includeCompletedValues: true, weekStart: weekStart, today: regenerationDate)
+        let futureRun = try #require(existing.workouts.last {
+            $0.workoutType.isRunning && !$0.isCompleted && $0.date > regenerationDate
+        })
 
         let regenerated = try await TrainingPlanService.generatePlan(
             profile: makeProfile([(.running, .primary, 4), (.strength, .supporting, 2)], trainingDays: 6),
             scope: .remainingCurrentWeek,
-            existingPlan: existing
+            existingPlan: existing,
+            regenerationDate: regenerationDate
         )
 
         let retained = try #require(regenerated.workouts.first { $0.id == futureRun.id })
@@ -1752,7 +1803,6 @@ struct TrainingProfileIntegrationTests {
     }
 
     @Test @MainActor func onboardingOwnershipRejectsMissingAthleteThenRetriesWithoutLosingProfileOrDraft() async throws {
-        let restoreCache = snapshotStandardCache()
         let defaults = isolatedDefaults()
         let manager = DataManager.shared
         let originalAthlete = manager.athlete
@@ -1763,7 +1813,6 @@ struct TrainingProfileIntegrationTests {
             manager.currentWeeklyPlan = originalCurrent
             manager.pendingNextWeekPlan = originalPending
             clear(defaults)
-            restoreCache()
         }
 
         let athleteID = 731
@@ -1778,7 +1827,6 @@ struct TrainingProfileIntegrationTests {
         manager.athlete = nil
         manager.currentWeeklyPlan = nil
         manager.pendingNextWeekPlan = nil
-        TrainingPlanService.clearCache()
 
         do {
             _ = try await OnboardingCompletionLifecycle.run(
@@ -1786,7 +1834,8 @@ struct TrainingProfileIntegrationTests {
                 generatePlan: {
                     _ = try await OnboardingInitialPlanGenerator.generate(
                         profile: profileStore.profile,
-                        manager: manager
+                        manager: manager,
+                        defaults: defaults
                     )
                 },
                 complete: { true },
@@ -1800,7 +1849,7 @@ struct TrainingProfileIntegrationTests {
         #expect(profileStore.profile == profile)
         #expect(try draftStore.load(for: athleteID) == answers)
         #expect(manager.currentWeeklyPlan == nil)
-        if case .missing = TrainingPlanService.cachedPlanStatus(for: profile) {
+        if case .missing = TrainingPlanService.cachedPlanStatus(for: profile, defaults: defaults) {
         } else {
             Issue.record("A plan was cached without a positive athlete ID")
         }
@@ -1828,14 +1877,14 @@ struct TrainingProfileIntegrationTests {
         authenticatedAthlete.id = athleteID
         manager.athlete = authenticatedAthlete
         manager.currentWeeklyPlan = nil
-        TrainingPlanService.clearCache()
 
         let completed = try await OnboardingCompletionLifecycle.run(
             saveProfile: { try profileStore.save(profile) },
             generatePlan: {
                 _ = try await OnboardingInitialPlanGenerator.generate(
                     profile: profileStore.profile,
-                    manager: manager
+                    manager: manager,
+                    defaults: defaults
                 )
             },
             complete: { true },
@@ -1846,7 +1895,7 @@ struct TrainingProfileIntegrationTests {
         #expect(manager.currentWeeklyPlan?.athleteId == athleteID)
         #expect(profileStore.profile == profile)
         #expect(try draftStore.load(for: athleteID) == nil)
-        if case let .valid(cached) = TrainingPlanService.cachedPlanStatus(for: profile) {
+        if case let .valid(cached) = TrainingPlanService.cachedPlanStatus(for: profile, defaults: defaults) {
             #expect(cached.athleteId == athleteID)
         } else {
             Issue.record("Expected the authenticated athlete to own the cached plan")
@@ -1917,12 +1966,12 @@ struct TrainingProfileIntegrationTests {
         )
     }
 
-    private func makePlan(includeCompletedValues: Bool = false) -> WeeklyTrainingPlan {
-        let weekStart = TrainingPlanService.currentWeekSunday()
+    private func makePlan(includeCompletedValues: Bool = false, weekStart: Date? = nil, today: Date = Date()) -> WeeklyTrainingPlan {
+        let weekStart = weekStart ?? TrainingPlanService.currentWeekSunday()
         let types: [WorkoutType] = [.longRun, .upperBody, .easyRun, .lowerBody, .tempoRun, .yoga, .easyRun]
         let workouts = types.enumerated().map { offset, type in
             let date = calendar.date(byAdding: .day, value: offset, to: weekStart)!
-            let completed = includeCompletedValues && (offset == 0 || offset == 1 || calendar.isDateInToday(date))
+            let completed = includeCompletedValues && (offset == 0 || offset == 1 || calendar.isDate(date, inSameDayAs: today))
             return DailyWorkout(
                 id: "original-\(offset)",
                 date: date,

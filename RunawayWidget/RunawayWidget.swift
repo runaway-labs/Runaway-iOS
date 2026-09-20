@@ -36,6 +36,7 @@ struct BecomingWidgetEntry: TimelineEntry {
     let weeklyGoal: Double
     let unit: String
     let updatedAt: Date?
+    let prescription: WidgetPrescriptionSnapshot?
     var progress: ProgressWidgetSnapshot = .preview
 
     var recommendedPath: BecomingWidgetPath {
@@ -88,6 +89,7 @@ struct BecomingWidgetProvider: AppIntentTimelineProvider {
             weeklyDistance: progress.weeklyDistance,
             weeklyGoal: max(1, (d?.double(forKey: "weekly_goal_miles") ?? 20) * conversion),
             unit: metric ? "km" : "mi", updatedAt: stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil,
+            prescription: WidgetPrescriptionSnapshot.cached(in: d),
             progress: progress
         )
     }
@@ -126,7 +128,7 @@ struct BecomingWidgetProvider: AppIntentTimelineProvider {
         let paths = WidgetBecomingChoice.allCases.map {
             BecomingWidgetPath(choice: $0, title: fallbackTitle($0), effect: fallbackEffect($0), weekEffect: "Protects tomorrow's quality session.", recommended: $0 == .easier)
         }
-        return BecomingWidgetEntry(date: Date(), headline: "Keep the week moving", detail: "Useful work without forcing it.", workout: "Easy Run", workoutDetail: "28 min · conversational", readiness: 57, recommendedChoice: .easier, selectedChoice: nil, weatherTitle: "RunCast · Clear window", weatherDetail: "Dry · Light breeze", paths: paths, weeklyDistance: 8.1, weeklyGoal: 20, unit: "mi", updatedAt: Date())
+        return BecomingWidgetEntry(date: Date(), headline: "Keep the week moving", detail: "Useful work without forcing it.", workout: "Easy Run", workoutDetail: "28 min · conversational", readiness: 57, recommendedChoice: .easier, selectedChoice: nil, weatherTitle: "RunCast · Clear window", weatherDetail: "Dry · Light breeze", paths: paths, weeklyDistance: 8.1, weeklyGoal: 20, unit: "mi", updatedAt: Date(), prescription: WidgetPrescriptionSnapshot(title: "Easy Run", detail: "28 min · conversational", status: .scheduled))
     }
 }
 
@@ -136,13 +138,13 @@ struct RunawayWidgetEntryView: View {
 
     var body: some View {
         switch family {
-        case .systemSmall: AccomplishmentWidgetView(progress: entry.progress, size: .small)
-        case .systemMedium: AccomplishmentWidgetView(progress: entry.progress, size: .medium)
-        case .systemLarge, .systemExtraLarge: AccomplishmentWidgetView(progress: entry.progress, size: .large)
+        case .systemSmall: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
+        case .systemMedium: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .medium)
+        case .systemLarge, .systemExtraLarge: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .large)
         case .accessoryCircular: circular
         case .accessoryRectangular: rectangular
         case .accessoryInline: inline
-        default: AccomplishmentWidgetView(progress: entry.progress, size: .small)
+        default: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
         }
     }
 
@@ -242,11 +244,17 @@ struct RunawayWidgetEntryView: View {
             Image(systemName: entry.recommendedChoice.icon).widgetAccentable()
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.workout).font(.headline).lineLimit(1)
-                Text("\(entry.readiness.map(String.init) ?? "--") ready · \(entry.recommendedChoice.shortTitle.capitalized)").font(.caption2).lineLimit(1)
+                Text(entry.prescription.map { "\($0.status.label) · \($0.detail)" }
+                     ?? "\(entry.readiness.map(String.init) ?? "--") ready · \(entry.recommendedChoice.shortTitle.capitalized)")
+                    .font(.caption2).lineLimit(1)
             }
         }
     }
-    private var inline: some View { Label("\(entry.workout) · \(entry.readiness.map(String.init) ?? "--") ready", systemImage: entry.recommendedChoice.icon) }
+    private var inline: some View {
+        Label(entry.prescription.map { "\($0.status.label): \($0.title)" }
+              ?? "\(entry.workout) · \(entry.readiness.map(String.init) ?? "--") ready",
+              systemImage: entry.prescription?.status == .completed ? "checkmark.circle.fill" : entry.recommendedChoice.icon)
+    }
 }
 
 struct RunawayWidget: Widget {

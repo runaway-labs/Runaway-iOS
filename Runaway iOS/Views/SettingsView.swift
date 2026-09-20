@@ -38,6 +38,8 @@ struct SettingsView: View {
     @State private var garminError: String?
     @State private var deleteAccountError: String?
     @State private var showingGoalSettings = false
+    @State private var showingWorkoutNotifications = false
+    @State private var showingAthleteTrainingProfile = false
 
     private var colors: (background: Color, cardBg: Color, textPrimary: Color, textSecondary: Color) {
         if themeManager.isDarkMode {
@@ -90,6 +92,14 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingGoalSettings) {
                 GoalSettingsView()
+            }
+            .sheet(isPresented: $showingWorkoutNotifications) {
+                if let athleteID = userSession.userId { WorkoutPromptSettingsView(athleteID: athleteID) }
+            }
+            .sheet(isPresented: $showingAthleteTrainingProfile) {
+                if let athleteID = userSession.userId {
+                    AthleteTrainingProfileView(athleteID: athleteID)
+                }
             }
             .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -158,13 +168,10 @@ struct SettingsView: View {
             SettingsRow(
                 icon: "bell",
                 title: "Notifications",
-                subtitle: "Manage push notifications",
+                subtitle: PushNotificationService.shared.settingsSummary,
                 color: AppTheme.Colors.accent
             ) {
-                // Open iOS notification settings for this app
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
+                showingWorkoutNotifications = true
             }
 
             SettingsRow(
@@ -204,6 +211,15 @@ struct SettingsView: View {
             Text("Goals")
                 .font(AppTheme.Typography.headline)
                 .foregroundColor(colors.textPrimary)
+
+            SettingsRow(
+                icon: "figure.strengthtraining.traditional",
+                title: "Goals & Current Ability",
+                subtitle: "Measurable targets, actual performance, and availability",
+                color: AppTheme.Colors.teal
+            ) {
+                showingAthleteTrainingProfile = true
+            }
 
             SettingsRow(
                 icon: "target",

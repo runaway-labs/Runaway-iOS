@@ -37,6 +37,7 @@ struct TrainingWeekTimeline: View {
             .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.08), lineWidth: 1))
     }
     private func status(_ workout: DailyWorkout) -> String {
+        if let completion = workout.acceptedCompletion { return completion.status }
         if workout.workoutType == .rest { return "Recovery is part of the plan" }
         if workout.isCompleted { return "Completed" }
         if Calendar.current.isDateInToday(workout.date) { return "Today" }

@@ -122,6 +122,11 @@ public final class UserSession {
     }
 
     private func updateAuthState(with user: Supabase.User) async {
+        if currentUser?.id != user.id {
+            NotificationCenter.default.post(name: .trainingSessionInvalidated, object: nil)
+            profileUser = nil
+            storedAthleteId = nil
+        }
         #if DEBUG
         print("🔐 UserSession: Updating auth state for user \(user.email ?? "unknown")")
         #endif
@@ -158,6 +163,7 @@ public final class UserSession {
             print("✅ UserSession: Athlete record confirmed with ID \(athleteId)")
             #endif
             completeAthleteSetup(with: .success(athleteId))
+            PushNotificationService.shared.resumeRegistration()
             writeWidgetConfiguration(athleteId: athleteId)
             await checkOnboardingStatusForAthlete(athleteId: athleteId)
         } catch {
@@ -313,6 +319,7 @@ public final class UserSession {
 
     /// Clear both auth and profile data
     private func clearSession() async {
+        NotificationCenter.default.post(name: .trainingSessionInvalidated, object: nil)
         await MainActor.run {
             self.currentUser = nil
             self.isAuthenticated = false
@@ -345,7 +352,13 @@ public final class UserSession {
     }
 
     func signOut() async throws {
-        try await supabase.auth.signOut()
+        try await PushNotificationService.shared.unregisterCurrentDevice()
+        do {
+            try await supabase.auth.signOut()
+        } catch {
+            PushNotificationService.shared.resumeRegistration()
+            throw error
+        }
         await clearSession()
     }
 

@@ -40,6 +40,18 @@ struct MainView: View {
     @State var selectedTab = RunawayTab.today
     @State var isDataReady: Bool = false
     @State private var showingRunRecording = false
+    @State private var workoutPromptRoute: WorkoutPromptRoute?
+    @ObservedObject private var promptReadiness = ReadinessService.shared
+    @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
+
+    private var promptPublication: WorkoutPromptPublication? {
+        guard let id = userSession.userId, !dataManager.isLoadingActivities else { return nil }
+        return WorkoutPromptPublication.make(
+            athleteID: id, plans: [dataManager.currentWeeklyPlan, dataManager.pendingNextWeekPlan].compactMap { $0 },
+            profile: trainingProfileStore.profile, activities: dataManager.activities,
+            readinessScore: promptReadiness.todaysReadiness?.score
+        )
+    }
 
     private var backgroundColor: Color {
         AppTheme.Colors.adaptiveBackground
@@ -121,6 +133,29 @@ struct MainView: View {
             .task {
                 await loadInitialData()
                 realtimeService.startRealtimeSubscription()
+            }
+            .task(id: PushNotificationService.shared.pendingActivityID) {
+                guard let id = PushNotificationService.shared.takePendingActivityID() else { return }
+                router.popToRoot()
+                router.navigate(to: .activityDetail(id))
+            }
+            .task(id: "\(promptPublication?.signature ?? "loading")-\(WorkoutPromptService.shared.syncRevision)") {
+                if let publication = promptPublication { await WorkoutPromptService.shared.publish(publication) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                WorkoutPromptService.shared.requestSync()
+            }
+            .task(id: PushNotificationService.shared.pendingWorkoutRoute) {
+                guard let route = PushNotificationService.shared.takePendingWorkoutRoute() else { return }
+                workoutPromptRoute = route
+            }
+            .sheet(item: $workoutPromptRoute) { route in
+                WorkoutPromptDeliveryView(route: route) {
+                    workoutPromptRoute = nil
+                    selectedTab = .today
+                    router.popToRoot()
+                    WorkoutPromptService.shared.requestSync()
+                }
             }
         } else {
             ZStack {

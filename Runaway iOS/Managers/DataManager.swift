@@ -197,6 +197,7 @@ class DataManager {
         profile: TrainingProfile? = nil,
         defaults: UserDefaults = .standard
     ) async {
+        defer { if defaults === UserDefaults.standard { try? refreshAcceptedWorkoutCompletions() } }
         let migrationPlan = currentWeeklyPlan
             ?? TrainingPlanService.cachedPlanForProfileMigration(defaults: defaults)
         let normalizedProfile = resolvedTrainingProfile(profile, existingPlan: migrationPlan)
@@ -222,6 +223,34 @@ class DataManager {
             currentWeeklyPlan = cachedPlan
             return
         }
+    }
+
+    /// Load only an account-owned, current-week plan for prescription review.
+    /// This never generates a replacement plan or applies a prescription.
+    @discardableResult
+    @MainActor
+    func loadPlanForPrescriptionAcceptance(
+        athleteID: Int,
+        profile: TrainingProfile? = nil,
+        defaults: UserDefaults = .standard,
+        activeAthleteID: @MainActor () -> Int? = {
+            UserSession.shared.isReady ? UserSession.shared.userId : nil
+        }
+    ) async -> Bool {
+        guard athleteID > 0, activeAthleteID() == athleteID else { return false }
+        if let current = currentWeeklyPlan, current.athleteId == athleteID, current.isCurrentWeek {
+            return true
+        }
+        let migrationPlan = currentWeeklyPlan ?? TrainingPlanService.cachedPlanForProfileMigration(defaults: defaults)
+        let normalized = resolvedTrainingProfile(profile, existingPlan: migrationPlan)
+        if let pending = TrainingPlanService.pendingNextWeekPlan(for: normalized, defaults: defaults), pending.isCurrentWeek {
+            guard pending.athleteId == athleteID else { return false }
+        } else {
+            guard case let .valid(cached) = TrainingPlanService.cachedPlanStatus(for: normalized, defaults: defaults),
+                  cached.athleteId == athleteID else { return false }
+        }
+        await loadCurrentWeeklyPlan(profile: normalized, defaults: defaults)
+        return activeAthleteID() == athleteID && currentWeeklyPlan?.athleteId == athleteID && currentWeeklyPlan?.isCurrentWeek == true
     }
 
     /// Check if any new activities require plan regeneration and regenerate if needed
@@ -390,10 +419,12 @@ class DataManager {
     /// Keep all plan surfaces synchronized after a deterministic on-device edit.
     func updateCurrentWeeklyPlan(
         _ plan: WeeklyTrainingPlan,
-        profile: TrainingProfile? = nil
+        profile: TrainingProfile? = nil,
+        acceptedReceipt: AcceptedPrescriptionPlanReceipt? = nil
     ) throws {
         let normalizedProfile = resolvedTrainingProfile(profile)
-        try TrainingPlanService.cachePlan(plan, profile: normalizedProfile)
+        try TrainingPlanService.cachePlan(plan, profile: normalizedProfile, acceptedReceipt: acceptedReceipt)
+        trainingPlanGenerationToken &+= 1
         currentWeeklyPlan = plan
     }
 

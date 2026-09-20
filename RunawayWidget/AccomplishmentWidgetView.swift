@@ -23,6 +23,7 @@ enum ProgressWidgetPalette {
 struct AccomplishmentWidgetView: View {
     enum Size { case small, medium, large }
     let progress: ProgressWidgetSnapshot
+    let prescription: WidgetPrescriptionSnapshot?
     let size: Size
 
     var body: some View {
@@ -73,6 +74,7 @@ struct AccomplishmentWidgetView: View {
                 Text(progress.hasWeeklyData ? progress.accomplishment : "Open Runaway to sync")
                     .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(ProgressWidgetPalette.secondary)
             }
+            prescriptionStrip(compact: true)
         }
     }
 
@@ -97,6 +99,7 @@ struct AccomplishmentWidgetView: View {
                         .font(.system(size: 9, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(ProgressWidgetPalette.secondary)
                 }
             }
+            prescriptionStrip(compact: false)
         }
     }
 
@@ -141,10 +144,34 @@ struct AccomplishmentWidgetView: View {
             }.frame(maxHeight: .infinity)
 
             Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+            prescriptionStrip(compact: false)
             HStack(spacing: 16) {
                 GoalProgressRing(title: "WEEK", value: progress.goalWeeklyDistance, goal: progress.weeklyGoal, unit: progress.goalUnit, available: progress.hasWeeklyData, color: ProgressWidgetPalette.amber)
                 GoalProgressRing(title: "MONTH", value: progress.goalMonthlyDistance, goal: progress.monthlyGoal, unit: progress.goalUnit, available: progress.hasMonthlyData, color: ProgressWidgetPalette.mint)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func prescriptionStrip(compact: Bool) -> some View {
+        if let prescription {
+            HStack(spacing: 7) {
+                Image(systemName: prescription.status == .completed ? "checkmark.circle.fill" : "bolt.fill")
+                    .foregroundStyle(prescription.status == .completed ? ProgressWidgetPalette.mint : ProgressWidgetPalette.blue)
+                    .widgetAccentable()
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(prescription.status.label.uppercased()) · \(prescription.title)")
+                        .font(.system(size: compact ? 8 : 9, weight: .bold, design: .rounded)).tracking(0.4)
+                        .lineLimit(1)
+                    if !compact {
+                        Text(prescription.detail).font(.system(size: 8, weight: .medium, design: .rounded))
+                            .foregroundStyle(ProgressWidgetPalette.secondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(prescription.status.label), \(prescription.title), \(prescription.detail)")
         }
     }
 

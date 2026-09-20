@@ -50,7 +50,24 @@ final class WidgetSyncService {
         defaults.set(snapshot.headline, forKey: "becoming_headline")
         defaults.set(snapshot.detail, forKey: "becoming_detail")
         defaults.set(workout?.title ?? "Today's training", forKey: "becoming_workout")
-        defaults.set(workout?.formattedDistance ?? "Ready when you are", forKey: "becoming_workout_detail")
+        let dose = [workout?.formattedDuration, workout?.formattedDistance, workout?.targetPace]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        defaults.set(dose.isEmpty ? "Ready when you are" : dose, forKey: "becoming_workout_detail")
+        if let workout {
+            let prescription = WidgetPrescriptionSnapshot(
+                title: workout.title,
+                detail: dose.isEmpty ? workout.workoutType.displayName : dose,
+                status: .resolve(
+                    isCompleted: workout.isCompleted,
+                    isPartial: workout.acceptedCompletion?.isPartial == true
+                )
+            )
+            if let data = try? JSONEncoder().encode(prescription) {
+                defaults.set(data, forKey: WidgetPrescriptionSnapshot.cacheKey)
+            }
+        } else {
+            defaults.removeObject(forKey: WidgetPrescriptionSnapshot.cacheKey)
+        }
         defaults.set(String(describing: snapshot.recommendedChoice), forKey: "becoming_recommended_choice")
         defaults.set(UnitPreferences.shared.distanceUnit.rawValue, forKey: "preferred_activity_distance_unit")
         defaults.set(Date().timeIntervalSince1970, forKey: "becoming_updated_at")

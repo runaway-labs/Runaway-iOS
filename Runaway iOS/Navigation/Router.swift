@@ -99,10 +99,15 @@ extension AppRouter {
 
 private struct RoutedActivityDetailView: View {
     @Environment(DataManager.self) private var dataManager
+    @Environment(UserSession.self) private var userSession
+    @State private var fetchedActivity: Activity?
+    @State private var isLoading = true
     let activityId: Int
 
     var body: some View {
-        if let activity = dataManager.activities.first(where: { $0.id == activityId }) {
+        Group {
+        if let activity = fetchedActivity ?? dataManager.activities.first(where: { $0.id == activityId }),
+           activity.athlete_id == userSession.userId {
             ActivityDetailView(
                 activity: LocalActivity(
                     id: activity.id,
@@ -110,18 +115,29 @@ private struct RoutedActivityDetailView: View {
                     type: activity.type ?? "",
                     summary_polyline: activity.summary_polyline ?? "",
                     distance: activity.distance ?? 0,
-                    start_date: activity.start_date.map(Date.init(timeIntervalSince1970:)),
+                    start_date: (activity.activity_date ?? activity.start_date).map(Date.init(timeIntervalSince1970:)),
                     elapsed_time: activity.elapsed_time ?? 0
                 )
             )
+        } else if isLoading {
+            ProgressView("Loading activity...")
         } else {
             ContentUnavailableView(
                 "Activity unavailable",
                 systemImage: "figure.run.circle",
-                description: Text("Refresh Activities and try this link again.")
+                description: Text("This activity may have been removed, or your connection is unavailable.")
             )
             .navigationTitle("Activity")
         }
+        }
+        .task(id: activityId) { await loadActivity() }
+        .refreshable { await loadActivity() }
+    }
+
+    private func loadActivity() async {
+        isLoading = true
+        defer { isLoading = false }
+        fetchedActivity = try? await ActivityService.getActivityById(id: activityId)
     }
 }
 

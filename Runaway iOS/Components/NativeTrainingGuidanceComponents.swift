@@ -403,7 +403,11 @@ struct NativeTrainingSummaryStrip: View {
     @StateObject private var locationManager = LocationManager.shared
 
     private var target: TrainingZoneTarget? {
-        NativeTrainingGuidancePolicy.zoneTarget(for: workout.workoutType)
+        WorkoutEffortDisplayPolicy.zoneTarget(for: workout)
+    }
+
+    private var effortLabel: String? {
+        WorkoutEffortDisplayPolicy.acceptedEffort(for: workout)?.title ?? target?.label
     }
 
     private var weatherGuidance: WeatherTrainingGuidance? {
@@ -424,17 +428,17 @@ struct NativeTrainingSummaryStrip: View {
     }
 
     var body: some View {
-        if target != nil || conditionsState != .hidden {
+        if effortLabel != nil || conditionsState != .hidden {
             VStack(spacing: 0) {
-                if let target {
+                if let effortLabel {
                     HStack(spacing: 10) {
                         Image(systemName: "waveform.path.ecg")
                             .foregroundColor(AppTheme.Colors.success)
-                        Text(target.label)
+                        Text(effortLabel)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
                         Spacer(minLength: 0)
-                        Text("Apple native")
+                        Text(workout.acceptedPrescription == nil ? "Apple native" : "Accepted session")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                             .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                     }
@@ -443,7 +447,7 @@ struct NativeTrainingSummaryStrip: View {
                 }
 
                 if conditionsState != .hidden {
-                    if target != nil {
+                    if effortLabel != nil {
                         Divider().overlay(Color.white.opacity(0.06))
                     }
                     conditionsRow
@@ -530,7 +534,7 @@ struct NativeWorkoutContextCard: View {
     @State private var deliverySucceeded = false
 
     private var target: TrainingZoneTarget? {
-        NativeTrainingGuidancePolicy.zoneTarget(for: workout.workoutType)
+        WorkoutEffortDisplayPolicy.zoneTarget(for: workout)
     }
 
     private var calibration: ReadinessCalibrationAssessment {
@@ -546,7 +550,9 @@ struct NativeWorkoutContextCard: View {
             Label("Native training intelligence", systemImage: "applewatch.radiowaves.left.and.right")
                 .font(.headline)
 
-            if let target {
+            if let effort = WorkoutEffortDisplayPolicy.acceptedEffort(for: workout) {
+                contextRow(icon: "figure.run", tint: .cyan, title: effort.title, detail: effort.detail)
+            } else if let target {
                 contextRow(
                     icon: "waveform.path.ecg",
                     tint: .cyan,

@@ -38,6 +38,8 @@ struct TodaysFocusCard: View {
     @StateObject private var nativeContext = NativeTrainingContextService.shared
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
     @State private var showingTrainingDecision = false
+    @State private var showingWorkoutDetails = false
+    @State private var showingRecordedWorkout: DailyWorkout?
     @State private var preferredBecomingChoice: BecomingChoice?
     @State private var changeReceipt: TodayWorkoutAdjustmentResult?
     @State private var planBeforeAdjustment: WeeklyTrainingPlan?
@@ -45,7 +47,8 @@ struct TodaysFocusCard: View {
     @State private var isApplyingAdjustment = false
 
     private var todaysWorkout: DailyWorkout? {
-        guard let plan = dataManager.currentWeeklyPlan, plan.isCurrentWeek else { return nil }
+        guard let plan = dataManager.currentWeeklyPlan, plan.isCurrentWeek,
+              UserSession.shared.isReady, plan.athleteId == UserSession.shared.userId else { return nil }
         return plan.workout(for: Date())
     }
 
@@ -70,6 +73,9 @@ struct TodaysFocusCard: View {
 
     /// Determine what to show for today
     private var todaysFocus: TodayFocusState {
+        if let workout = todaysWorkout, workout.acceptedCompletion != nil {
+            return .prescriptionRecorded(workout)
+        }
         // Priority 1: If there's an activity today, show "Completed"
         if let activity = todaysActivity {
             return .activityCompleted(activity)
@@ -109,23 +115,17 @@ struct TodaysFocusCard: View {
     }
 
     private var recommendation: TodayRecommendation {
-        let date = Date()
-        let workouts = dataManager.currentWeeklyPlan?.workouts ?? []
-        let context = TodayRecommendationContextBuilder.build(
-            date: date,
+        recommendationEvaluation.recommendation
+    }
+
+    private var recommendationEvaluation: TodayRecommendationExplanation {
+        TodayRecommendationExplanation.evaluate(
+            date: Date(),
             profile: trainingProfileStore.profile,
             plannedWorkout: todaysWorkout,
-            planWorkouts: workouts,
+            planWorkouts: dataManager.currentWeeklyPlan?.workouts ?? [],
             activities: dataManager.activities,
             readinessScore: readinessService.todaysReadiness?.score
-        )
-
-        return TodayRecommendationPolicy.recommendation(
-            plannedWorkout: todaysWorkout,
-            profile: trainingProfileStore.profile,
-            recentCompletedWorkouts: context.recentCompletedWorkouts,
-            readinessScore: readinessService.todaysReadiness?.score,
-            schedulingContext: context.schedulingContext
         )
     }
 
@@ -181,7 +181,7 @@ struct TodaysFocusCard: View {
     private var shouldOfferTrainingDecision: Bool {
         TodayRecommendationPolicy.canChooseTodaysTraining(
             plannedWorkout: decisionWorkout,
-            hasCompletedActivity: todaysActivity != nil
+            hasCompletedActivity: todaysActivity != nil || todaysWorkout?.acceptedCompletion != nil
         )
     }
 
@@ -244,6 +244,10 @@ struct TodaysFocusCard: View {
                 EyebrowLabel(text: nextUpLabel, color: AppTheme.Colors.warmAmber)
                 Spacer()
                 switch todaysFocus {
+                case .prescriptionRecorded(let workout):
+                    Text(workout.acceptedCompletion?.status ?? "Recorded")
+                        .font(.caption.bold())
+                        .foregroundStyle(workout.acceptedCompletion?.isPartial == true ? Color.orange : Color.green)
                 case .activityCompleted:
                     Text("Completed")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -289,6 +293,22 @@ struct TodaysFocusCard: View {
             }
 
             switch todaysFocus {
+            case .prescriptionRecorded(let workout):
+                Button { showingRecordedWorkout = workout } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: workout.acceptedCompletion?.isPartial == true ? "circle.lefthalf.filled" : "checkmark.circle.fill")
+                            .font(.title2).foregroundStyle(.green)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(workout.title).font(.headline)
+                            if let completion = workout.acceptedCompletion {
+                                Text("\(Int(ceil(completion.elapsedSeconds / 60))) min recorded · View your work")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }.padding(12).contentShape(Rectangle())
+                }.buttonStyle(.plain)
             case .activityCompleted(let activity):
                 HStack(spacing: 12) {
                     ZStack {
@@ -325,7 +345,7 @@ struct TodaysFocusCard: View {
 
             case .plannedWorkout(let workout, let presentation):
                 Button {
-                    presentTrainingDecision()
+                    showingWorkoutDetails = true
                 } label: {
                     HStack(spacing: 12) {
                         ZStack {
@@ -357,7 +377,7 @@ struct TodaysFocusCard: View {
                                 }
                             }
                             if !workout.description.isEmpty {
-                                Text(workout.description)
+                                Text(workout.displayDescription)
                                     .font(.system(size: 12, design: .rounded))
                                     .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                                     .lineLimit(1)
@@ -383,8 +403,8 @@ struct TodaysFocusCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Change \(workout.title)")
-                .accessibilityHint("Opens today's training choices and adapts the remaining week.")
+                .accessibilityLabel("View \(workout.title)")
+                .accessibilityHint("Opens the workout breakdown. Use Adjust today to change your session.")
 
             case .readyToRun:
                 HStack(spacing: 12) {
@@ -442,7 +462,7 @@ struct TodaysFocusCard: View {
             case .readinessRecommendation(let recommendation):
                 let presentation = TodayRecommendationPresentation(recommendation: recommendation)
                 Button {
-                    presentTrainingDecision()
+                    showingWorkoutDetails = true
                 } label: {
                     HStack(spacing: 12) {
                         ZStack {
@@ -480,8 +500,8 @@ struct TodaysFocusCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Change \(recommendation.title)")
-                .accessibilityHint("Opens today's training choices and adapts the remaining week.")
+                .accessibilityLabel("View \(recommendation.title)")
+                .accessibilityHint("Opens today's recommendation. Use Adjust today to change your session.")
             }
 
             if let workout = todaysWorkout,
@@ -579,8 +599,14 @@ struct TodaysFocusCard: View {
             syncBecomingWidget()
             await drainPendingWidgetChoice()
         }
+        .task(id: dataManager.athlete?.id) {
+            await loadSavedPlanForToday()
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            Task { await drainPendingWidgetChoice() }
+            Task {
+                await loadSavedPlanForToday()
+                await drainPendingWidgetChoice()
+            }
         }
         .sheet(isPresented: $showingTrainingDecision) {
             if let workout = decisionWorkout {
@@ -595,6 +621,38 @@ struct TodaysFocusCard: View {
                 }
             }
         }
+        .sheet(item: $showingRecordedWorkout) { WorkoutDetailSheet(workout: $0) }
+        .sheet(isPresented: $showingWorkoutDetails) {
+            let evaluation = recommendationEvaluation
+            let recommendation = evaluation.recommendation
+            if let workout = TodayRecommendationDetailPolicy.workout(
+                recommendation: recommendation, plannedWorkout: todaysWorkout, date: evaluation.evaluatedAt
+            ) {
+                WorkoutDetailSheet(
+                    workout: workout,
+                    whyToday: recommendation.reason ?? recommendation.detail,
+                    recommendationOnly: workout.id != todaysWorkout?.id,
+                    recommendationExplanation: evaluation
+                )
+            } else {
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(recommendation.title).font(.title2.bold())
+                            Text(recommendation.detail)
+                            TodayRecommendationExplanationView(explanation: evaluation)
+                        }
+                        .padding()
+                    }
+                    .navigationTitle("Today's guidance")
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingWorkoutDetails = false }
+                        }
+                    }
+                }
+            }
+        }
         .alert("Plan update failed", isPresented: Binding(
             get: { adjustmentErrorMessage != nil },
             set: { if !$0 { adjustmentErrorMessage = nil } }
@@ -602,6 +660,14 @@ struct TodaysFocusCard: View {
             Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
         } message: {
             Text(adjustmentErrorMessage ?? "Please try again.")
+        }
+    }
+
+    @MainActor private func loadSavedPlanForToday() async {
+        guard UserSession.shared.isReady, let athleteID = UserSession.shared.userId else { return }
+        // Read an owned saved week only; opening Today never generates a plan.
+        if await dataManager.loadPlanForPrescriptionAcceptance(athleteID: athleteID) {
+            try? dataManager.refreshAcceptedWorkoutCompletions()
         }
     }
 
@@ -624,7 +690,8 @@ struct TodaysFocusCard: View {
     private var widgetSnapshotSignature: String {
         [becomingSnapshot.headline, String(describing: becomingSnapshot.recommendedChoice),
          String(readinessService.todaysReadiness?.score ?? -1), decisionWorkout?.id ?? "none",
-         weatherGuidance?.title ?? ""].joined(separator: "|")
+         decisionWorkout?.acceptedCompletion?.status ?? "scheduled",
+         String(decisionWorkout?.isCompleted == true), weatherGuidance?.title ?? ""].joined(separator: "|")
     }
 
     @MainActor
@@ -1076,6 +1143,7 @@ private struct TrainingDecisionSheet: View {
 
 /// State for Today's Focus card
 private enum TodayFocusState {
+    case prescriptionRecorded(DailyWorkout)
     case activityCompleted(Activity)
     case plannedWorkout(DailyWorkout, TodayRecommendationPresentation)
     case readyToRun

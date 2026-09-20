@@ -326,6 +326,15 @@ struct Runaway_iOSTests {
         #expect(alternate.weekEffect == "Rebalances 5 future sessions after you choose.")
     }
 
+    @Test func widgetPrescriptionDistinguishesScheduledPartialAndCompletedWork() {
+        #expect(WidgetPrescriptionStatus.resolve(isCompleted: false, isPartial: false) == .scheduled)
+        #expect(WidgetPrescriptionStatus.resolve(isCompleted: false, isPartial: true) == .partial)
+        #expect(WidgetPrescriptionStatus.resolve(isCompleted: true, isPartial: false) == .completed)
+        #expect(WidgetPrescriptionStatus.scheduled.label == "Up next")
+        #expect(WidgetPrescriptionStatus.partial.label == "Partial")
+        #expect(WidgetPrescriptionStatus.completed.label == "Completed")
+    }
+
     @Test func raceDateRoundTripsWithoutChangingCalendarDay() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "America/Chicago"))

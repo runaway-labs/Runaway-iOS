@@ -1,5 +1,37 @@
 import Foundation
 
+enum WidgetPrescriptionStatus: String, Codable, Equatable, Sendable {
+    case scheduled
+    case partial
+    case completed
+
+    static func resolve(isCompleted: Bool, isPartial: Bool) -> Self {
+        if isPartial { return .partial }
+        return isCompleted ? .completed : .scheduled
+    }
+
+    var label: String {
+        switch self {
+        case .scheduled: return "Up next"
+        case .partial: return "Partial"
+        case .completed: return "Completed"
+        }
+    }
+}
+
+struct WidgetPrescriptionSnapshot: Codable, Equatable, Sendable {
+    static let cacheKey = "widget_prescription_snapshot_v1"
+
+    let title: String
+    let detail: String
+    let status: WidgetPrescriptionStatus
+
+    static func cached(in defaults: UserDefaults?) -> Self? {
+        guard let data = defaults?.data(forKey: cacheKey) else { return nil }
+        return try? JSONDecoder().decode(Self.self, from: data)
+    }
+}
+
 enum ProgressActivityKind: String, Codable, CaseIterable, Sendable {
     case run, walk, strength, bike, swim, hike, mobility, other
 

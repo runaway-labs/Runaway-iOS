@@ -50,6 +50,52 @@ struct TodayRecommendationContext {
     let schedulingContext: SchedulingDayContext
 }
 
+/// A recommendation and its input context evaluated together, without a second
+/// explanation-only ranking pass or any persistence of personal training data.
+struct TodayRecommendationExplanation {
+    let evaluatedAt: Date
+    let recommendation: TodayRecommendation
+    let readinessScore: Int?
+    let completedWorkouts: [DailyWorkout]
+    let nextPlannedWorkout: WorkoutType?
+    let reservedFutureSessionCount: Int
+    let trainingMix: [String]
+    let didRankAlternatives: Bool
+
+    static func evaluate(
+        date: Date,
+        profile: TrainingProfile,
+        plannedWorkout: DailyWorkout?,
+        planWorkouts: [DailyWorkout],
+        activities: [Activity],
+        readinessScore: Int?
+    ) -> TodayRecommendationExplanation {
+        let context = TodayRecommendationContextBuilder.build(
+            date: date, profile: profile, plannedWorkout: plannedWorkout,
+            planWorkouts: planWorkouts, activities: activities, readinessScore: readinessScore
+        )
+        let recommendation = TodayRecommendationPolicy.recommendation(
+            plannedWorkout: plannedWorkout, profile: profile,
+            recentCompletedWorkouts: context.recentCompletedWorkouts,
+            readinessScore: readinessScore, schedulingContext: context.schedulingContext
+        )
+        return TodayRecommendationExplanation(
+            evaluatedAt: date,
+            recommendation: recommendation,
+            readinessScore: readinessScore,
+            completedWorkouts: context.recentCompletedWorkouts,
+            nextPlannedWorkout: context.schedulingContext.nextWorkout,
+            reservedFutureSessionCount: max(0,
+                context.schedulingContext.assignedWorkoutTypes.count - context.recentCompletedWorkouts.count),
+            trainingMix: profile.activities.filter { $0.sessionsPerWeek > 0 }.map {
+                "\($0.activity.rawValue.capitalized): \($0.sessionsPerWeek)/week (\($0.role.rawValue))"
+            },
+            didRankAlternatives: recommendation.schedulingReason != nil
+                && recommendation.schedulingReason != .requiredPrimary
+        )
+    }
+}
+
 enum TodayRecommendationAccent: Equatable {
     case runningPrimary
     case aerobic
@@ -130,6 +176,12 @@ enum TodayRecommendationContextBuilder {
 
         var completedBySession: [String: DailyWorkout] = [:]
         for workout in completedPlanWorkouts {
+            // Imported activities remain authoritative for activity totals. A linked
+            // local completion on the same sport/day must not add a second exposure.
+            if workout.acceptedCompletion != nil && recordedWorkouts.contains(where: {
+                calendar.isDate($0.date, inSameDayAs: workout.acceptedCompletion!.completedAt)
+                    && $0.workoutType.activity == workout.workoutType.activity
+            }) { continue }
             completedBySession[sessionKey(for: workout, calendar: calendar)] = workout
         }
         for workout in recordedWorkouts {
@@ -148,13 +200,13 @@ enum TodayRecommendationContextBuilder {
             return $0.date < $1.date
         }
 
+        // Future assignments reserve training slots. Missed past assignments
+        // neither satisfy training frequency nor establish completed workload.
         let incompleteAssignments = planWorkouts.filter {
-            !$0.isCompleted && !calendar.isDate($0.date, inSameDayAs: date)
+            !$0.isCompleted && $0.date >= tomorrow
         }.map(\.workoutType)
         let assignedWorkoutTypes = incompleteAssignments + recentCompleted.map(\.workoutType)
         let previousWorkout = recentCompleted.last(where: {
-            calendar.isDate($0.date, inSameDayAs: yesterday)
-        })?.workoutType ?? planWorkouts.last(where: {
             calendar.isDate($0.date, inSameDayAs: yesterday)
         })?.workoutType
         let nextWorkout = planWorkouts.first(where: {
@@ -215,21 +267,39 @@ enum TodayRecommendationContextBuilder {
     }
 
     private static func workoutType(for activity: Activity) -> WorkoutType? {
-        let description = [activity.name, activity.type]
-            .compactMap { $0 }
-            .joined(separator: " ")
+        // A title can refine a confirmed sport, but cannot establish the sport.
+        // Unknown types remain unclassified instead of inventing training load.
+        guard let recordedType = activity.type else { return nil }
+        let type = recordedType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
 
-        if description.contains("long run") { return .longRun }
-        if description.contains("run") { return .easyRun }
-        if description.contains("ride") || description.contains("cycl") || description.contains("bike") { return .cycling }
-        if description.contains("swim") { return .swimming }
-        if description.contains("walk") { return .walking }
-        if description.contains("hike") { return .hiking }
-        if description.contains("yoga") { return .yoga }
-        if description.contains("stretch") || description.contains("mobility") { return .stretchMobility }
-        if description.contains("strength") || description.contains("weight") { return .strengthTraining }
-        return nil
+        switch type {
+        case "run", "running", "trailrun", "trailrunning", "virtualrun",
+             "treadmill", "treadmillrun", "jog", "jogging":
+            return activity.name?.lowercased().contains("long run") == true ? .longRun : .easyRun
+        case "ride", "cycling", "bike", "biking", "virtualride", "ebikeride",
+             "mountainbikeride", "gravelride", "indoorcycling":
+            return .cycling
+        case "swim", "swimming":
+            return .swimming
+        case "walk", "walking":
+            return .walking
+        case "hike", "hiking":
+            return .hiking
+        case "yoga":
+            return .yoga
+        case "stretch", "stretching", "mobility", "stretchmobility":
+            return .stretchMobility
+        case "strength", "strengthtraining", "weighttraining", "weights",
+             "functionalstrengthtraining", "traditionalstrengthtraining":
+            return .strengthTraining
+        default:
+            return nil
+        }
     }
 }
 
@@ -332,7 +402,7 @@ enum TodayRecommendationPolicy {
                 directive: .proceed,
                 status: "Ready",
                 title: "Follow Today's Plan",
-                detail: "Your readiness supports the planned training.",
+                detail: "Your readiness supports training today.",
                 systemImage: "figure.run"
             )
         }
@@ -369,7 +439,7 @@ enum TodayRecommendationPolicy {
                 directive: readinessRecommendation.directive,
                 status: readinessRecommendation.status,
                 title: plannedWorkout.title,
-                detail: readinessRecommendation.detail,
+                detail: "Your readiness supports the planned training.",
                 systemImage: plannedWorkout.workoutType.icon,
                 workoutType: plannedWorkout.workoutType,
                 reason: "Scheduled in your plan.",
@@ -389,7 +459,7 @@ enum TodayRecommendationPolicy {
                 }
                 .last?
                 .workoutType
-        } ?? schedulingContext.previousWorkout
+        }
 
         let selectionReadiness: SchedulingReadiness = switch readinessRecommendation.directive {
         case .recover, .reduceIntensity: .low
@@ -461,7 +531,8 @@ enum TodayRecommendationPolicy {
     }
 
     private static func isUserSelectedToday(_ workout: DailyWorkout) -> Bool {
-        workout.description.hasPrefix("Adjusted for today's readiness")
+        workout.acceptedPrescription != nil
+            || workout.description.hasPrefix("Adjusted for today's readiness")
             || workout.description.hasPrefix("Chosen for today")
     }
 
