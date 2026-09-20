@@ -34,7 +34,8 @@ enum TrainingEvidenceImportService {
     }
 
     static func importRuns(_ activities: [Activity], athleteID: Int,
-                           repository: ProtectedTrainingRepository, now: Date = Date()) async throws -> Report {
+                           repository: ProtectedTrainingRepository, now: Date = Date(),
+                           eventSink: (@MainActor (CoachEvent) async -> Void)? = nil) async throws -> Report {
         let history = try repository.observations(athleteID: athleteID)
         var bySource = Dictionary(grouping: history.filter { $0.source == .importedActivity }, by: \.sourceRecordID)
         var report = Report()
@@ -58,6 +59,18 @@ enum TrainingEvidenceImportService {
             try repository.append(candidate, athleteID: athleteID)
             bySource[candidate.sourceRecordID] = [candidate]
             report.imported += 1
+            let event = CoachEvent(
+                athleteID: athleteID, kind: .workoutImported, source: .app,
+                occurredAt: candidate.measuredAt, receivedAt: candidate.receivedAt,
+                sourceRecordID: candidate.sourceRecordID,
+                payload: .workoutImported(activityID: activity.id)
+            )
+            if let eventSink {
+                await eventSink(event)
+            } else {
+                let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+                try ledger.append(event)
+            }
             await Task.yield()
         }
         return report

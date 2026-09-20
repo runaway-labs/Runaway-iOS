@@ -73,4 +73,40 @@ enum RemainingWeekTrainingPolicy {
             return answer(.open, "\(available.availableMinutes) minutes available. No missed workout has been carried forward as debt; choose a goal-aligned session after the recovery review.")
         }
     }
+
+    /// Produces only conservative, measurable adaptations. Other events remain
+    /// no-ops until a deterministic domain policy supplies a candidate plan.
+    static func candidatePlan(for event: CoachEvent, in plan: WeeklyTrainingPlan,
+                              calendar: Calendar = .current) -> WeeklyTrainingPlan {
+        let reduction: Double
+        switch event.payload {
+        case .readinessChanged(let score) where (score ?? 100) < 45:
+            reduction = 0.7
+        case .weatherChanged(_, let severity) where severity >= 0.75:
+            reduction = 0.8
+        default:
+            return plan
+        }
+        guard let target = plan.workouts
+            .filter({ !$0.isCompleted && $0.workoutType != .rest && $0.date >= calendar.startOfDay(for: event.occurredAt) })
+            .sorted(by: { $0.date < $1.date }).first else { return plan }
+        let workouts = plan.workouts.map { workout -> DailyWorkout in
+            guard workout.id == target.id else { return workout }
+            return DailyWorkout(
+                id: workout.id, date: workout.date, dayOfWeek: workout.dayOfWeek,
+                workoutType: workout.workoutType,
+                title: "Adjusted " + workout.title,
+                description: "Reduced from the protected plan after new recovery or weather evidence.",
+                duration: workout.duration.map { max(10, Int((Double($0) * reduction).rounded())) },
+                distance: workout.distance.map { $0 * reduction }, targetPace: workout.targetPace,
+                exercises: workout.exercises, isCompleted: workout.isCompleted,
+                completedActivityId: workout.completedActivityId,
+                acceptedPrescription: workout.acceptedPrescription,
+                acceptedCompletion: workout.acceptedCompletion
+            )
+        }
+        return AcceptedPrescriptionPlanPolicy.replacingWorkouts(
+            in: plan, with: workouts, generatedAt: event.receivedAt
+        )
+    }
 }

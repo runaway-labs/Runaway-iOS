@@ -93,6 +93,10 @@ final class CoachDecisionLedger {
         try repository.coachDecisions(athleteID: athleteID)
     }
 
+    func decision(forEvent eventID: UUID) throws -> CoachDecision? {
+        try decisions().last { $0.eventIDs.contains(eventID) }
+    }
+
     @discardableResult
     func replaceDecision(_ updated: CoachDecision, expected original: CoachDecision) throws -> CoachDecision {
         guard updated.id == original.id,
@@ -175,7 +179,9 @@ final class CoachDecisionLedger {
         return CoachUndoResult(restoredPlan: restoredPlan, reversal: reversal)
     }
 
-    static func fingerprint(of plan: WeeklyTrainingPlan) throws -> String {
+    nonisolated static func fingerprint(of plan: WeeklyTrainingPlan) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
         let digest = SHA256.hash(data: try encoder.encode(plan))
         return digest.map { String(format: "%02x", $0) }.joined()
     }

@@ -58,6 +58,19 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 await DataManager.shared.refreshActivities()
                 await MainActor.run { completionHandler(.newData) }
             }
+        } else if let syncType = userInfo["sync_type"] as? String, syncType == "coach_event" {
+            Task { @MainActor in
+                guard let athleteID = UserSession.shared.userId else {
+                    completionHandler(.noData)
+                    return
+                }
+                do {
+                    let saved = try CoachEventService.persistRemotePayload(userInfo, athleteID: athleteID)
+                    completionHandler(saved ? .newData : .noData)
+                } catch {
+                    completionHandler(.failed)
+                }
+            }
         } else {
             completionHandler(.noData)
         }

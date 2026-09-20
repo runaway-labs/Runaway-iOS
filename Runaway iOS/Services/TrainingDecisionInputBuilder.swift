@@ -102,4 +102,8 @@ enum TrainingDecisionInputBuilder {
         return TrainingDecisionInputs(profile: profile, observations: current, localDayStart: dayStart,
             timeZone: timeZone, today: today, fingerprint: fingerprint, sessionResults: currentResults)
     }
+
+    static func revision(for plan: WeeklyTrainingPlan) throws -> String {
+        try CoachDecisionLedger.fingerprint(of: plan)
+    }
 }

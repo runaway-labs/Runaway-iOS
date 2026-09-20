@@ -117,6 +117,7 @@ class DataManager {
         syncFromStores()
         updateWidgetData()
         lastDataRefresh = Date()
+        await processPendingCoachEvents(athleteID: userId)
     }
 
     func loadActivities(for userId: Int) async {
@@ -188,6 +189,79 @@ class DataManager {
 
         // Check if plan needs regeneration based on new activities
         await checkAndRegeneratePlanIfNeeded()
+    }
+
+    private func processPendingCoachEvents(athleteID: Int) async {
+        await loadCurrentWeeklyPlan()
+        guard currentWeeklyPlan?.athleteId == athleteID else { return }
+        let repository = ProtectedTrainingRepository(activeAthleteID: {
+            UserSession.shared.userId
+        })
+        let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+        let coordinator = CoachCoordinator(ledger: ledger)
+        let service = CoachEventService(
+            ledger: ledger,
+            coordinator: coordinator,
+            context: { [weak self] event in
+                guard let self, let active = self.currentWeeklyPlan,
+                      active.athleteId == athleteID else {
+                    throw ProtectedTrainingRepository.RepositoryError.ownershipMismatch
+                }
+                let candidate: WeeklyTrainingPlan
+                if event.kind == .workoutImported {
+                    let weekActivities = self.activities.filter { activity in
+                        guard let timestamp = activity.activity_date ?? activity.start_date else { return false }
+                        return TrainingPlanService.containsActivityDate(
+                            Date(timeIntervalSince1970: timestamp), in: active
+                        )
+                    }
+                    candidate = try await TrainingPlanService.regeneratePlanWithActivities(
+                        athleteId: athleteID,
+                        currentPlan: active,
+                        completedActivities: weekActivities,
+                        goal: self.currentGoal,
+                        profile: self.resolvedTrainingProfile(nil, existingPlan: active)
+                    )
+                } else {
+                    candidate = RemainingWeekTrainingPolicy.candidatePlan(for: event, in: active)
+                }
+                return CoachContext(
+                    athleteID: athleteID,
+                    activePlan: active,
+                    candidatePlan: candidate,
+                    planRevision: try TrainingDecisionInputBuilder.revision(for: active),
+                    reasonCodes: Self.reasonCodes(for: event),
+                    safetyFlags: [],
+                    missingData: []
+                )
+            },
+            activate: { [weak self] plan, expectedRevision in
+                guard let self, let current = self.currentWeeklyPlan,
+                      try TrainingDecisionInputBuilder.revision(for: current) == expectedRevision else {
+                    throw ProtectedTrainingRepository.RepositoryError.staleCoachDecision
+                }
+                try self.updateCurrentWeeklyPlan(plan)
+            }
+        )
+        do {
+            try await service.processPending(athleteID: athleteID)
+        } catch {
+            #if DEBUG
+            print("Coach catch-up preserved pending events: \(error.localizedDescription)")
+            #endif
+        }
+    }
+
+    private static func reasonCodes(for event: CoachEvent) -> [CoachReasonCode] {
+        switch event.kind {
+        case .workoutImported: [.workoutImported]
+        case .sessionResultChanged, .sessionElapsed: [.completionChanged]
+        case .readinessChanged: [.recoveryDeclined]
+        case .weatherChanged: [.weatherChanged]
+        case .availabilityChanged: [.availabilityChanged]
+        case .reevaluationRequested, .proposalResponded: [.athleteRequested]
+        case .appForegrounded, .scheduledCheckIn, .profileChanged: []
+        }
     }
 
     // MARK: - Adaptive Training Plan
