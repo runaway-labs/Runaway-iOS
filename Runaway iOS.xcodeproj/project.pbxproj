@@ -70,6 +70,7 @@
 			membershipExceptions = (
 				"Runaway iOSTests/ActivityRecordingRetirementTests.swift",
 				"Runaway iOSTests/ActivityObservationGeneratorTests.swift",
+				"Runaway iOSTests/CoachDomainTests.swift",
 				"Runaway iOSTests/AthleteServiceTests.swift",
 				"Runaway iOSTests/ComplementarySchedulingPolicyTests.swift",
 				"Runaway iOSTests/EdgeFunctionClientTests.swift",
@@ -103,6 +104,7 @@
 			membershipExceptions = (
 				"Runaway iOSTests/ActivityRecordingRetirementTests.swift",
 				"Runaway iOSTests/ActivityObservationGeneratorTests.swift",
+				"Runaway iOSTests/CoachDomainTests.swift",
 				"Runaway iOSTests/AthleteServiceTests.swift",
 				"Runaway iOSTests/ComplementarySchedulingPolicyTests.swift",
 				"Runaway iOSTests/EdgeFunctionClientTests.swift",
