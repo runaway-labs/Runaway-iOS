@@ -364,6 +364,12 @@ class FoundationModelsService: ObservableObject {
     }
 }
 
+extension FoundationModelsService: CoachTextGenerating {
+    func generate(prompt: String, systemPrompt: String, maxTokens: Int) async throws -> String {
+        try await generateResponse(prompt: prompt, systemPrompt: systemPrompt, maxTokens: maxTokens)
+    }
+}
+
 // MARK: - Error Types
 
 enum FoundationModelsError: LocalizedError {

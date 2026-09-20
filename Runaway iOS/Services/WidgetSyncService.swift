@@ -39,6 +39,24 @@ final class WidgetSyncService {
         WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
     }
 
+    func updateCoachDecision(
+        _ decision: CoachDecision,
+        originalActiveWorkoutID: String,
+        proposedActiveWorkoutID: String?
+    ) {
+        guard let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier),
+              defaults.integer(forKey: TrainingProgressSnapshot.athleteKey) == decision.athleteID else { return }
+        let snapshot = CoachWidgetSnapshot.make(
+            decision: decision,
+            originalActiveWorkoutID: originalActiveWorkoutID,
+            proposedActiveWorkoutID: proposedActiveWorkoutID,
+            now: Date()
+        )
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        defaults.set(data, forKey: CoachWidgetSnapshot.cacheKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
+    }
+
     func updateBecomingData(
         snapshot: BecomingSnapshot,
         workout: DailyWorkout?,
@@ -369,5 +387,41 @@ final class WidgetSyncService {
             UIApplication.shared.endBackgroundTask(backgroundTaskId)
             backgroundTaskId = .invalid
         }
+    }
+}
+
+extension CoachWidgetSnapshot {
+    static func make(
+        decision: CoachDecision,
+        originalActiveWorkoutID: String,
+        proposedActiveWorkoutID: String?,
+        now: Date
+    ) -> Self {
+        let state = CoachWidgetDecisionState(rawValue: decision.state.rawValue) ?? .blocked
+        let isApplied = decision.state == .applied
+        let reason = decision.reasonCodes.first.map { reason in
+            switch reason {
+            case .workoutImported: return "New workout imported"
+            case .workoutMissed: return "A session was missed"
+            case .completionChanged: return "Completion was updated"
+            case .recoveryDeclined: return "Recovery declined"
+            case .recoveryImproved: return "Recovery improved"
+            case .weatherChanged: return "Conditions changed"
+            case .availabilityChanged: return "Availability changed"
+            case .athleteRequested: return "You requested a change"
+            case .unsafeChange: return "The change was not safe"
+            case .stalePlan: return "The plan changed"
+            }
+        } ?? "Training context changed"
+        return Self(
+            athleteID: decision.athleteID,
+            decisionID: decision.id,
+            state: state,
+            headline: decision.state == .proposed ? "Review change" : isApplied ? "Week updated" : "Coach decision",
+            shortReason: reason,
+            updatedAt: now,
+            undoAvailable: isApplied,
+            activeWorkoutID: isApplied ? (proposedActiveWorkoutID ?? originalActiveWorkoutID) : originalActiveWorkoutID
+        )
     }
 }

@@ -32,6 +32,63 @@ struct WidgetPrescriptionSnapshot: Codable, Equatable, Sendable {
     }
 }
 
+enum CoachWidgetDecisionState: String, Codable, Equatable, Sendable {
+    case proposed
+    case applied
+    case rejected
+    case superseded
+    case undone
+    case blocked
+}
+
+struct CoachWidgetSnapshot: Codable, Equatable, Sendable {
+    static let cacheKey = "coach_widget_snapshot_v1"
+    static let maximumAge: TimeInterval = 4 * 60 * 60
+
+    let athleteID: Int
+    let decisionID: UUID
+    let state: CoachWidgetDecisionState
+    let headline: String
+    let shortReason: String
+    let updatedAt: Date
+    let undoAvailable: Bool
+    let activeWorkoutID: String
+
+    func isCurrent(at date: Date = Date()) -> Bool {
+        date >= updatedAt && date.timeIntervalSince(updatedAt) <= Self.maximumAge
+    }
+
+    static func cached(in defaults: UserDefaults?, athleteID: Int) -> Self? {
+        guard athleteID > 0,
+              let data = defaults?.data(forKey: cacheKey),
+              let snapshot = try? JSONDecoder().decode(Self.self, from: data),
+              snapshot.athleteID == athleteID else { return nil }
+        return snapshot
+    }
+}
+
+enum CoachWidgetAction: String, Codable, Sendable {
+    case review
+    case accept
+    case keepOriginal
+    case undo
+    case reevaluate
+}
+
+struct CoachWidgetActionRequest: Codable, Sendable {
+    static let cacheKey = "coach_widget_action_request_v1"
+    let athleteID: Int
+    let decisionID: UUID?
+    let action: CoachWidgetAction
+    let selectedPath: String?
+    let createdAt: Date
+
+    func store(in defaults: UserDefaults?) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults?.set(data, forKey: Self.cacheKey)
+    }
+}
+
 enum ProgressActivityKind: String, Codable, CaseIterable, Sendable {
     case run, walk, strength, bike, swim, hike, mobility, other
 

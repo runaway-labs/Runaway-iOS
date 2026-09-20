@@ -7,6 +7,7 @@ struct CoachDecisionDetailView: View {
     @State private var decision: CoachDecision?
     @State private var model: CoachActivityViewModel?
     @State private var errorMessage: String?
+    @State private var narration: CoachNarration?
     var body: some View {
         ScrollView {
             if let decision { VStack(alignment: .leading, spacing: AppTheme.Spacing.xl) {
@@ -17,6 +18,24 @@ struct CoachDecisionDetailView: View {
                         .font(AppTheme.Typography.title)
                     Text("Deterministic training policy made this call. On-device intelligence may explain it, but cannot alter the prescription.")
                         .font(AppTheme.Typography.body).foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)
+                }
+                if let narration {
+                    VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                        HStack {
+                            Label("Coach read", systemImage: "waveform.and.sparkles")
+                                .font(AppTheme.Typography.headline)
+                            Spacer()
+                            Text(narration.provenance == .onDevice ? "ON DEVICE" : "POLICY")
+                                .font(AppTheme.Typography.caption.weight(.bold))
+                                .foregroundStyle(AppTheme.Colors.warmAmber)
+                        }
+                        Text(narration.summary).font(AppTheme.Typography.body.weight(.semibold))
+                        Text(narration.detail)
+                            .font(AppTheme.Typography.caption)
+                            .foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)
+                    }
+                    .padding(AppTheme.Spacing.lg)
+                    .background(AppTheme.Colors.adaptiveCardBackground, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
                 }
                 ForEach(decision.changes) { change in
                     VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
@@ -36,7 +55,7 @@ struct CoachDecisionDetailView: View {
                 actionButtons(decision)
             }.padding(AppTheme.Spacing.md) } else { ProgressView().padding(.top, 80) }
         }.background(AppTheme.Colors.adaptiveBackground).navigationTitle("Coach decision").navigationBarTitleDisplayMode(.inline)
-            .task { load() }
+            .task { load(); await loadNarration() }
             .alert("Couldn’t apply that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) { }
             } message: { Text(errorMessage ?? "Review the current plan and try again.") }
@@ -60,6 +79,10 @@ struct CoachDecisionDetailView: View {
             guard let current = dataManager.currentWeeklyPlan, try CoachDecisionLedger.fingerprint(of: current) == expected else { throw ProtectedTrainingRepository.RepositoryError.staleCoachDecision }
             try dataManager.updateCurrentWeeklyPlan(plan) })
         model = vm; try? vm.load(athleteID: athleteID); decision = (vm.pending + vm.history).first { $0.id == decisionID }
+    }
+    private func loadNarration() async {
+        guard let decision, !decision.changes.isEmpty else { return }
+        narration = await CoachNarrator().explain(CoachDecisionNarrationInput(decision: decision))
     }
     private func perform(_ operation: () throws -> Void) { do { try operation(); load() } catch { errorMessage = model?.errorMessage ?? error.localizedDescription } }
 }

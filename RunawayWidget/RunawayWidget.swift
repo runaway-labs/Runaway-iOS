@@ -37,6 +37,7 @@ struct BecomingWidgetEntry: TimelineEntry {
     let unit: String
     let updatedAt: Date?
     let prescription: WidgetPrescriptionSnapshot?
+    let coach: CoachWidgetSnapshot?
     var progress: ProgressWidgetSnapshot = .preview
 
     var recommendedPath: BecomingWidgetPath {
@@ -76,6 +77,9 @@ struct BecomingWidgetProvider: AppIntentTimelineProvider {
         }
         let stamp = d?.double(forKey: "becoming_updated_at") ?? 0
         let progress = ProgressWidgetSnapshot.read(from: d, at: date, selectedTypes: selectedTypes)
+        let athleteID = d?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0
+        let cachedCoach = CoachWidgetSnapshot.cached(in: d, athleteID: athleteID)
+        let coach = cachedCoach?.isCurrent(at: date) == true ? cachedCoach : nil
         return BecomingWidgetEntry(
             date: date,
             headline: d?.string(forKey: "becoming_headline") ?? "Build from today's choice",
@@ -90,6 +94,7 @@ struct BecomingWidgetProvider: AppIntentTimelineProvider {
             weeklyGoal: max(1, (d?.double(forKey: "weekly_goal_miles") ?? 20) * conversion),
             unit: metric ? "km" : "mi", updatedAt: stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil,
             prescription: WidgetPrescriptionSnapshot.cached(in: d),
+            coach: coach,
             progress: progress
         )
     }
@@ -128,7 +133,7 @@ struct BecomingWidgetProvider: AppIntentTimelineProvider {
         let paths = WidgetBecomingChoice.allCases.map {
             BecomingWidgetPath(choice: $0, title: fallbackTitle($0), effect: fallbackEffect($0), weekEffect: "Protects tomorrow's quality session.", recommended: $0 == .easier)
         }
-        return BecomingWidgetEntry(date: Date(), headline: "Keep the week moving", detail: "Useful work without forcing it.", workout: "Easy Run", workoutDetail: "28 min · conversational", readiness: 57, recommendedChoice: .easier, selectedChoice: nil, weatherTitle: "RunCast · Clear window", weatherDetail: "Dry · Light breeze", paths: paths, weeklyDistance: 8.1, weeklyGoal: 20, unit: "mi", updatedAt: Date(), prescription: WidgetPrescriptionSnapshot(title: "Easy Run", detail: "28 min · conversational", status: .scheduled))
+        return BecomingWidgetEntry(date: Date(), headline: "Keep the week moving", detail: "Useful work without forcing it.", workout: "Easy Run", workoutDetail: "28 min · conversational", readiness: 57, recommendedChoice: .easier, selectedChoice: nil, weatherTitle: "RunCast · Clear window", weatherDetail: "Dry · Light breeze", paths: paths, weeklyDistance: 8.1, weeklyGoal: 20, unit: "mi", updatedAt: Date(), prescription: WidgetPrescriptionSnapshot(title: "Easy Run", detail: "28 min · conversational", status: .scheduled), coach: nil)
     }
 }
 
@@ -137,14 +142,40 @@ struct RunawayWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        switch family {
-        case .systemSmall: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
-        case .systemMedium: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .medium)
-        case .systemLarge, .systemExtraLarge: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .large)
-        case .accessoryCircular: circular
-        case .accessoryRectangular: rectangular
-        case .accessoryInline: inline
-        default: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
+        ZStack(alignment: .topTrailing) {
+            switch family {
+            case .systemSmall: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
+            case .systemMedium: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .medium)
+            case .systemLarge, .systemExtraLarge: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .large)
+            case .accessoryCircular: circular
+            case .accessoryRectangular: rectangular
+            case .accessoryInline: inline
+            default: AccomplishmentWidgetView(progress: entry.progress, prescription: entry.prescription, size: .small)
+            }
+            if family == .systemSmall || family == .systemMedium || family == .systemLarge,
+               let coach = entry.coach {
+                coachBadge(coach)
+                    .padding(10)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func coachBadge(_ coach: CoachWidgetSnapshot) -> some View {
+        if coach.state == .proposed {
+            Button(intent: ReviewCoachDecisionIntent(decisionID: coach.decisionID)) {
+                Label("REVIEW", systemImage: "arrow.triangle.branch")
+                    .font(.system(size: 8, weight: .black, design: .rounded))
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .foregroundStyle(ProgressWidgetPalette.ink)
+                    .background(BecomingWidgetTheme.caution, in: Capsule())
+            }.buttonStyle(.plain)
+        } else {
+            Label("ADAPTED", systemImage: "checkmark")
+                .font(.system(size: 8, weight: .black, design: .rounded))
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .foregroundStyle(BecomingWidgetTheme.mint)
+                .background(BecomingWidgetTheme.surface.opacity(0.94), in: Capsule())
         }
     }
 
@@ -241,17 +272,18 @@ struct RunawayWidgetEntryView: View {
     private var circular: some View { readinessGauge.widgetAccentable() }
     private var rectangular: some View {
         HStack(spacing: 8) {
-            Image(systemName: entry.recommendedChoice.icon).widgetAccentable()
+            Image(systemName: entry.coach?.state == .proposed ? "arrow.triangle.branch" : entry.recommendedChoice.icon).widgetAccentable()
             VStack(alignment: .leading, spacing: 1) {
-                Text(entry.workout).font(.headline).lineLimit(1)
-                Text(entry.prescription.map { "\($0.status.label) · \($0.detail)" }
+                Text(entry.coach?.headline ?? entry.workout).font(.headline).lineLimit(1)
+                Text(entry.coach?.shortReason ?? entry.prescription.map { "\($0.status.label) · \($0.detail)" }
                      ?? "\(entry.readiness.map(String.init) ?? "--") ready · \(entry.recommendedChoice.shortTitle.capitalized)")
                     .font(.caption2).lineLimit(1)
             }
         }
     }
     private var inline: some View {
-        Label(entry.prescription.map { "\($0.status.label): \($0.title)" }
+        Label(entry.coach.map { "\($0.headline): \($0.shortReason)" }
+              ?? entry.prescription.map { "\($0.status.label): \($0.title)" }
               ?? "\(entry.workout) · \(entry.readiness.map(String.init) ?? "--") ready",
               systemImage: entry.prescription?.status == .completed ? "checkmark.circle.fill" : entry.recommendedChoice.icon)
     }
@@ -265,7 +297,7 @@ struct RunawayWidget: Widget {
                 .containerBackground(for: .widget) {
                     LinearGradient(colors: [ProgressWidgetPalette.ink, Color(red: 0.055, green: 0.105, blue: 0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
-                .widgetURL(URL(string: "runaway://today"))
+                .widgetURL(entry.coach.map { URL(string: "runaway://coach/\($0.decisionID.uuidString)")! } ?? URL(string: "runaway://today"))
         }
         .configurationDisplayName("Runaway Progress")
         .description("See the distance you've earned, your activity this week, and your goals coming closer.")

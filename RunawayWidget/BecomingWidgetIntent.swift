@@ -44,7 +44,60 @@ struct ChooseBecomingPathIntent: AppIntent {
         defaults?.set(choice.rawValue, forKey: "becoming_pending_choice")
         defaults?.set(choice.rawValue, forKey: "becoming_selected_choice")
         defaults?.set(Date().timeIntervalSince1970, forKey: "becoming_action_date")
+        CoachWidgetActionRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            decisionID: nil,
+            action: .reevaluate,
+            selectedPath: choice.rawValue,
+            createdAt: Date()
+        ).store(in: defaults)
         WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
+struct ReviewCoachDecisionIntent: AppIntent {
+    static var title: LocalizedStringResource = "Review Coach Change"
+    static var description = IntentDescription("Open the exact plan change and the evidence behind it.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Decision") var decisionID: String
+
+    init() { decisionID = "" }
+    init(decisionID: UUID) { self.decisionID = decisionID.uuidString }
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        CoachWidgetActionRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            decisionID: UUID(uuidString: decisionID),
+            action: .review,
+            selectedPath: nil,
+            createdAt: Date()
+        ).store(in: defaults)
+        return .result()
+    }
+}
+
+struct UndoCoachDecisionIntent: AppIntent {
+    static var title: LocalizedStringResource = "Request Coach Undo"
+    static var description = IntentDescription("Open Runaway to safely undo the latest coach change.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Decision") var decisionID: String
+
+    init() { decisionID = "" }
+    init(decisionID: UUID) { self.decisionID = decisionID.uuidString }
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        CoachWidgetActionRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            decisionID: UUID(uuidString: decisionID),
+            action: .undo,
+            selectedPath: nil,
+            createdAt: Date()
+        ).store(in: defaults)
         return .result()
     }
 }

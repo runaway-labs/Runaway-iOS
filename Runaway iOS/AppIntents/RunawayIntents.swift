@@ -30,7 +30,37 @@ struct GetDailyBriefIntent: AppIntent {
     static var description = IntentDescription("Get your Runaway daily training brief.")
     static var openAppWhenRun = true
 
-    func perform() async throws -> some OpensIntent {
+    func perform() async throws -> some ReturnsValue<String> & ProvidesDialog {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        let athleteID = defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0
+        let coach = CoachWidgetSnapshot.cached(in: defaults, athleteID: athleteID)
+        let prescription = WidgetPrescriptionSnapshot.cached(in: defaults)
+        let response: String
+        if let coach, coach.isCurrent() {
+            response = "\(coach.headline). \(coach.shortReason)."
+        } else if let prescription {
+            response = "\(prescription.status.label): \(prescription.title), \(prescription.detail)."
+        } else {
+            response = defaults?.string(forKey: "becoming_headline") ?? "Open Runaway for today's grounded training brief."
+        }
+        return .result(value: response, dialog: IntentDialog(stringLiteral: response))
+    }
+}
+
+struct ReevaluateTrainingIntent: AppIntent {
+    static var title: LocalizedStringResource = "Reevaluate Today's Training"
+    static var description = IntentDescription("Ask Runaway to reevaluate today's prescription from current training data.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        CoachWidgetActionRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            decisionID: nil,
+            action: .reevaluate,
+            selectedPath: nil,
+            createdAt: Date()
+        ).store(in: defaults)
         return .result()
     }
 }
