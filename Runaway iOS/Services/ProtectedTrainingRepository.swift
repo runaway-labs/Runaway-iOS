@@ -203,6 +203,77 @@ final class ProtectedTrainingRepository {
         return try append(linked, athleteID: athleteID)
     }
 
+    func coachEventRecords(athleteID: Int) throws -> [ProtectedCoachEventRecord] {
+        try requireOwner(athleteID)
+        let folder = directory(athleteID).appendingPathComponent("coach-events", isDirectory: true)
+        guard files.fileExists(atPath: folder.path) else { return [] }
+        return try files.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .map { url in
+                let record = try JSONDecoder().decode(
+                    ProtectedCoachEventRecord.self,
+                    from: Data(contentsOf: url)
+                )
+                guard record.event.athleteID == athleteID,
+                      record.event.isValid,
+                      url.deletingPathExtension().lastPathComponent == record.event.id.uuidString else {
+                    throw RepositoryError.invalidRecord
+                }
+                return record
+            }
+            .sorted {
+                if $0.event.occurredAt != $1.event.occurredAt {
+                    return $0.event.occurredAt < $1.event.occurredAt
+                }
+                return $0.event.id.uuidString < $1.event.id.uuidString
+            }
+    }
+
+    func saveCoachEventRecord(_ record: ProtectedCoachEventRecord, athleteID: Int) throws {
+        try requireOwner(athleteID)
+        guard record.event.athleteID == athleteID, record.event.isValid else {
+            throw RepositoryError.ownershipMismatch
+        }
+        try write(
+            record,
+            to: directory(athleteID).appendingPathComponent("coach-events", isDirectory: true)
+                .appendingPathComponent(record.event.id.uuidString + ".json")
+        )
+    }
+
+    func coachDecisions(athleteID: Int) throws -> [CoachDecision] {
+        try requireOwner(athleteID)
+        let folder = directory(athleteID).appendingPathComponent("coach-decisions", isDirectory: true)
+        guard files.fileExists(atPath: folder.path) else { return [] }
+        return try files.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .map { url in
+                let decision = try JSONDecoder().decode(CoachDecision.self, from: Data(contentsOf: url))
+                guard decision.athleteID == athleteID,
+                      decision.isValid,
+                      url.deletingPathExtension().lastPathComponent == decision.id.uuidString else {
+                    throw RepositoryError.invalidRecord
+                }
+                return decision
+            }
+            .sorted {
+                if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+    }
+
+    func saveCoachDecision(_ decision: CoachDecision, athleteID: Int) throws {
+        try requireOwner(athleteID)
+        guard decision.athleteID == athleteID, decision.isValid else {
+            throw RepositoryError.ownershipMismatch
+        }
+        try write(
+            decision,
+            to: directory(athleteID).appendingPathComponent("coach-decisions", isDirectory: true)
+                .appendingPathComponent(decision.id.uuidString + ".json")
+        )
+    }
+
     private func directory(_ athleteID: Int) -> URL {
         root.appendingPathComponent(String(athleteID), isDirectory: true)
     }
@@ -231,6 +302,7 @@ final class ProtectedTrainingRepository {
     enum RepositoryError: LocalizedError {
         case ownershipMismatch, invalidRecord, conflictingObservation, invalidCorrection
         case conflictingSessionResult, duplicateSessionReference
+        case conflictingCoachEvent, conflictingCoachDecision, staleCoachDecision, staleUndo
         var errorDescription: String? {
             switch self {
             case .ownershipMismatch: return "Sign in to the account that owns this training data."
@@ -239,6 +311,10 @@ final class ProtectedTrainingRepository {
             case .invalidCorrection: return "This correction no longer matches the current observation. Reload before trying again."
             case .conflictingSessionResult: return "This session is already saved with different values. Its original record has been preserved."
             case .duplicateSessionReference: return "A completed-session record already exists for this goal preview. Open completed session records to review it; it has not been counted twice."
+            case .conflictingCoachEvent: return "This coach event already exists with different evidence. The original event was preserved."
+            case .conflictingCoachDecision: return "This coach decision already exists with different details. The original decision was preserved."
+            case .staleCoachDecision: return "This coach decision changed before it could be saved. Reload the current decision and try again."
+            case .staleUndo: return "The training plan changed after this decision. Undo was stopped to preserve the newer plan."
             }
         }
     }
