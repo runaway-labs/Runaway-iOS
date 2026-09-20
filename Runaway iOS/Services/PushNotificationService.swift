@@ -5,6 +5,36 @@ import Supabase
 import UIKit
 import UserNotifications
 
+struct CoachNotificationRoute: Equatable, Identifiable {
+    enum Category: String { case automatic, approval }
+    let decisionID: UUID
+    let athleteID: Int
+    let expectedRevision: String
+    let category: Category
+    var id: UUID { decisionID }
+
+    init?(userInfo: [AnyHashable: Any]) {
+        guard let rawID = userInfo["coach_decision_id"] as? String,
+              let decisionID = UUID(uuidString: rawID),
+              let expectedRevision = userInfo["expected_revision"] as? String,
+              !expectedRevision.isEmpty,
+              let categoryRaw = userInfo["coach_category"] as? String,
+              let category = Category(rawValue: categoryRaw) else { return nil }
+        let athleteID = (userInfo["athlete_id"] as? Int)
+            ?? (userInfo["athlete_id"] as? String).flatMap(Int.init)
+        guard let athleteID, athleteID > 0 else { return nil }
+        self.decisionID = decisionID
+        self.athleteID = athleteID
+        self.expectedRevision = expectedRevision
+        self.category = category
+    }
+}
+
+struct CoachNotificationCommand: Equatable {
+    let route: CoachNotificationRoute
+    let actionIdentifier: String
+}
+
 @MainActor
 @Observable
 final class PushNotificationService {
@@ -29,6 +59,9 @@ final class PushNotificationService {
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     private(set) var pendingActivityID: Int?
     private(set) var pendingWorkoutRoute: WorkoutPromptRoute?
+    private(set) var pendingCoachRoute: CoachNotificationRoute?
+    private(set) var coachCommandRevision = 0
+    @ObservationIgnored private var pendingCoachCommands: [CoachNotificationCommand] = []
     @ObservationIgnored private var token: String?
     @ObservationIgnored private var registrationTask: Task<Void, Never>?
     @ObservationIgnored private var isSynchronizing = false
@@ -63,6 +96,7 @@ final class PushNotificationService {
 
     func activate() async {
         let center = UNUserNotificationCenter.current()
+        registerCoachCategories(center: center)
         var settings = await center.notificationSettings()
         if settings.authorizationStatus == .notDetermined {
             do { _ = try await center.requestAuthorization(options: [.alert, .badge, .sound]) }
@@ -130,6 +164,12 @@ final class PushNotificationService {
     }
 
     func receiveNotification(_ userInfo: [AnyHashable: Any]) {
+        if let route = CoachNotificationRoute(userInfo: userInfo) {
+            pendingCoachRoute = route
+            pendingWorkoutRoute = nil
+            pendingActivityID = nil
+            return
+        }
         if let route = WorkoutPromptRoute(userInfo: userInfo) {
             pendingWorkoutRoute = route
             pendingActivityID = nil
@@ -141,6 +181,38 @@ final class PushNotificationService {
         guard let id, id > 0 else { return }
         pendingActivityID = id
         pendingWorkoutRoute = nil
+    }
+
+    func takePendingCoachRoute() -> CoachNotificationRoute? {
+        guard let athlete = athleteID(), let route = pendingCoachRoute else { return nil }
+        pendingCoachRoute = nil
+        return route.athleteID == athlete ? route : nil
+    }
+
+    func enqueueCoachAction(_ userInfo: [AnyHashable: Any], actionIdentifier: String) {
+        guard let route = CoachNotificationRoute(userInfo: userInfo) else { return }
+        let command = CoachNotificationCommand(route: route, actionIdentifier: actionIdentifier)
+        guard !pendingCoachCommands.contains(command) else { return }
+        pendingCoachCommands.append(command)
+        coachCommandRevision &+= 1
+    }
+
+    func takePendingCoachCommands() -> [CoachNotificationCommand] {
+        guard let athlete = athleteID() else { return [] }
+        let owned = pendingCoachCommands.filter { $0.route.athleteID == athlete }
+        pendingCoachCommands.removeAll { $0.route.athleteID == athlete }
+        return owned
+    }
+
+    private func registerCoachCategories(center: UNUserNotificationCenter) {
+        let review = UNNotificationAction(identifier: "RUNAWAY_COACH_REVIEW", title: "Review")
+        let undo = UNNotificationAction(identifier: "RUNAWAY_COACH_UNDO", title: "Undo")
+        let accept = UNNotificationAction(identifier: "RUNAWAY_COACH_ACCEPT", title: "Accept")
+        let keep = UNNotificationAction(identifier: "RUNAWAY_COACH_KEEP", title: "Keep Original")
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: "RUNAWAY_COACH_AUTOMATIC", actions: [review, undo], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "RUNAWAY_COACH_APPROVAL", actions: [review, accept, keep], intentIdentifiers: [])
+        ])
     }
 
     func takePendingWorkoutRoute() -> WorkoutPromptRoute? {
@@ -170,6 +242,8 @@ final class PushNotificationService {
             }
             pendingActivityID = nil
             pendingWorkoutRoute = nil
+            pendingCoachRoute = nil
+            pendingCoachCommands = []
             WorkoutPromptService.shared.reset()
             registrationStatus = .waiting
         } catch {

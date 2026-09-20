@@ -85,6 +85,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
+            if response.actionIdentifier != UNNotificationDefaultActionIdentifier,
+               response.actionIdentifier != UNNotificationDismissActionIdentifier {
+                PushNotificationService.shared.enqueueCoachAction(userInfo, actionIdentifier: response.actionIdentifier)
+            }
             PushNotificationService.shared.receiveNotification(userInfo)
         }
         #if DEBUG

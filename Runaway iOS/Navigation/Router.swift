@@ -21,6 +21,8 @@ class AppRouter {
         case commitmentSetup
         case goalManagement
         case awards
+        case coachActivity
+        case coachDecision(UUID)
     }
 
     // MARK: - Navigation Methods
@@ -93,8 +95,22 @@ extension AppRouter {
 
         case .awards:
             AwardsView()
+        case .coachActivity:
+            CoachActivityRouteView()
+        case .coachDecision(let id):
+            CoachDecisionRouteView(decisionID: id)
         }
     }
+}
+
+private struct CoachActivityRouteView: View {
+    @Environment(UserSession.self) private var session
+    var body: some View { if let id = session.userId { CoachActivityView(athleteID: id) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
+}
+private struct CoachDecisionRouteView: View {
+    @Environment(UserSession.self) private var session
+    let decisionID: UUID
+    var body: some View { if let id = session.userId { CoachDecisionDetailView(athleteID: id, decisionID: decisionID) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
 }
 
 private struct RoutedActivityDetailView: View {

@@ -120,6 +120,7 @@ struct CoachDecision: Codable, Equatable, Identifiable, Sendable {
     let createdAt: Date
     let appliedAt: Date?
     let previousPlanData: Data?
+    let proposedPlanData: Data?
     let appliedPlanFingerprint: String?
 
     init(id: UUID = UUID(), athleteID: Int, eventIDs: [UUID], beforeRevision: String,
@@ -127,6 +128,7 @@ struct CoachDecision: Codable, Equatable, Identifiable, Sendable {
          classification: CoachDecisionClassification, state: CoachDecisionState,
          confidence: Double, missingData: [String], policyVersion: String,
          createdAt: Date, appliedAt: Date? = nil, previousPlanData: Data? = nil,
+         proposedPlanData: Data? = nil,
          appliedPlanFingerprint: String? = nil) {
         self.id = id
         self.athleteID = athleteID
@@ -143,6 +145,7 @@ struct CoachDecision: Codable, Equatable, Identifiable, Sendable {
         self.createdAt = createdAt
         self.appliedAt = appliedAt
         self.previousPlanData = previousPlanData
+        self.proposedPlanData = proposedPlanData
         self.appliedPlanFingerprint = appliedPlanFingerprint
     }
 

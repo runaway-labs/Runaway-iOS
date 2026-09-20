@@ -90,6 +90,7 @@ final class CoachCoordinator {
             createdAt: stored.receivedAt,
             appliedAt: state == .applied ? Date() : nil,
             previousPlanData: proposal.previousPlanData,
+            proposedPlanData: proposal.proposedPlanData,
             appliedPlanFingerprint: state == .applied ? candidateRevision : nil
         )
         try ledger.appendDecision(decision)

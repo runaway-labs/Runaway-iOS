@@ -114,7 +114,10 @@ final class CoachDecisionLedger {
               updated.policyVersion == original.policyVersion,
               updated.createdAt == original.createdAt,
               updated.previousPlanData == original.previousPlanData,
-              updated.appliedPlanFingerprint == original.appliedPlanFingerprint,
+              updated.proposedPlanData == original.proposedPlanData,
+              (updated.state == .applied
+                ? updated.appliedPlanFingerprint?.isEmpty == false
+                : updated.appliedPlanFingerprint == original.appliedPlanFingerprint),
               updated.isValid else {
             throw ProtectedTrainingRepository.RepositoryError.invalidRecord
         }
@@ -173,6 +176,7 @@ final class CoachDecisionLedger {
             createdAt: now,
             appliedAt: now,
             previousPlanData: try Self.encoder.encode(currentPlan),
+            proposedPlanData: previousPlanData,
             appliedPlanFingerprint: try Self.fingerprint(of: restoredPlan)
         )
         try appendDecision(reversal)

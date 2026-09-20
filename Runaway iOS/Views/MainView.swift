@@ -117,6 +117,14 @@ struct MainView: View {
                 router.popToRoot()
                 router.navigate(to: .activityDetail(id))
             }
+            .task(id: PushNotificationService.shared.pendingCoachRoute?.id) {
+                guard let route = PushNotificationService.shared.takePendingCoachRoute() else { return }
+                router.popToRoot()
+                router.navigate(to: .coachDecision(route.decisionID))
+            }
+            .task(id: PushNotificationService.shared.coachCommandRevision) {
+                processCoachNotificationCommands()
+            }
             .task(id: "\(promptPublication?.signature ?? "loading")-\(WorkoutPromptService.shared.syncRevision)") {
                 if let publication = promptPublication { await WorkoutPromptService.shared.publish(publication) }
             }
@@ -234,6 +242,31 @@ struct MainView: View {
 }
 
 extension MainView {
+    @MainActor
+    private func processCoachNotificationCommands() {
+        guard let athleteID = userSession.userId else { return }
+        let repository = ProtectedTrainingRepository(activeAthleteID: { userSession.userId })
+        let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+        let model = CoachActivityViewModel(ledger: ledger, currentPlan: { dataManager.currentWeeklyPlan },
+            activate: { plan, expected in
+                guard let current = dataManager.currentWeeklyPlan,
+                      try CoachDecisionLedger.fingerprint(of: current) == expected else {
+                    throw ProtectedTrainingRepository.RepositoryError.staleCoachDecision
+                }
+                try dataManager.updateCurrentWeeklyPlan(plan)
+            })
+        for command in PushNotificationService.shared.takePendingCoachCommands() {
+            switch command.actionIdentifier {
+            case "RUNAWAY_COACH_ACCEPT": try? model.accept(command.route.decisionID)
+            case "RUNAWAY_COACH_KEEP": try? model.keepOriginal(command.route.decisionID)
+            case "RUNAWAY_COACH_UNDO": _ = try? model.undo(command.route.decisionID)
+            default: break
+            }
+            router.popToRoot()
+            router.navigate(to: .coachDecision(command.route.decisionID))
+        }
+    }
+
     private func loadInitialData() async {
         guard let authId = userSession.currentUser?.id else {
             isDataReady = true

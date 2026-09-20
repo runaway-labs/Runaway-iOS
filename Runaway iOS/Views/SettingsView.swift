@@ -174,6 +174,12 @@ struct SettingsView: View {
                 showingWorkoutNotifications = true
             }
 
+            NavigationLink(value: AppRouter.Route.coachActivity) {
+                SettingsRow(icon: "list.bullet.clipboard", title: "Coach Activity",
+                    subtitle: "Review plan changes, approvals, and Undo history",
+                    color: AppTheme.Colors.warmAmber) { }
+            }.buttonStyle(.plain)
+
             SettingsRow(
                 icon: "location",
                 title: "Location Services",

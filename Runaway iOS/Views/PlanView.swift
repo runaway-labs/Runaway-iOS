@@ -30,6 +30,8 @@ struct PlanView: View {
     @State private var allGoals: [AthleteRace] = []
     @State private var isLoadingGoals = false
     @State private var lastRefreshError: String? = nil
+    @State private var coachDecision: CoachDecision?
+    @Environment(AppRouter.self) private var router
     private var bg:   Color { AppTheme.Colors.DarkMode.background }
     private var card: Color { AppTheme.Colors.DarkMode.cardBackground }
     private var pri:  Color { AppTheme.Colors.DarkMode.textPrimary }
@@ -105,6 +107,7 @@ struct PlanView: View {
             }
         }
         .task(id: dataManager.athlete?.id) { allGoals = []; await loadAll() }
+        .task(id: dataManager.currentWeeklyPlan?.generatedAt) { loadCoachDecision() }
         .onChange(of: dataManager.currentWeeklyPlan?.generatedAt) { _, _ in
             viewModel.currentPlan = dataManager.currentWeeklyPlan
             viewModel.displayedPlan = dataManager.currentWeeklyPlan
@@ -132,6 +135,15 @@ struct PlanView: View {
         isLoadingGoals = false
     }
 
+    private func loadCoachDecision() {
+        guard let athleteID = dataManager.athlete?.id else { coachDecision = nil; return }
+        let repository = ProtectedTrainingRepository(activeAthleteID: { UserSession.shared.userId })
+        let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+        coachDecision = try? ledger.decisions().reversed().first {
+            $0.state == .proposed || ($0.state == .applied && Date().timeIntervalSince($0.createdAt) < 172_800)
+        }
+    }
+
     // MARK: - Upcoming Content
 
     @ViewBuilder
@@ -150,6 +162,12 @@ struct PlanView: View {
 
                 // ── Training Plan ──────────────────────────
                 sectionHeader("TRAINING PLAN")
+
+                if let coachDecision {
+                    CoachChangeBanner(decision: coachDecision) {
+                        router.navigate(to: .coachDecision(coachDecision.id))
+                    }
+                }
 
                 if viewModel.isLoading && viewModel.displayedPlan == nil {
                     LoadingPlanView()
