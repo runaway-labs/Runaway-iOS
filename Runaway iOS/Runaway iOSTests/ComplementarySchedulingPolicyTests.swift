@@ -574,6 +574,96 @@ struct ComplementarySchedulingPolicyTests {
         }
     }
 
+    @Test("Supporting strength workouts never inherit a running pace")
+    func supportingStrengthNeverInheritsRunningPace() async throws {
+        let run = DailyWorkout(
+            id: "easy-run",
+            date: Self.weekStart,
+            dayOfWeek: .sunday,
+            workoutType: .easyRun,
+            title: "Easy Run",
+            description: "Aerobic work",
+            duration: 40,
+            distance: 4,
+            targetPace: "9:22/mi",
+            exercises: nil,
+            isCompleted: false,
+            completedActivityId: nil
+        )
+        let runningPlan = WeeklyTrainingPlan(
+            id: "running-template",
+            athleteId: 42,
+            weekStartDate: Self.weekStart,
+            weekEndDate: Self.calendar.date(byAdding: .day, value: 6, to: Self.weekStart)!,
+            workouts: [run],
+            weekNumber: 1,
+            totalMileage: 4,
+            focusArea: "Test",
+            notes: nil,
+            generatedAt: Self.weekStart,
+            goalId: nil
+        )
+        let profile = makeProfile(
+            activities: [
+                preference(.running, .primary, 1),
+                preference(.strength, .supporting, 1),
+            ],
+            trainingDays: 2
+        )
+
+        let plan = try await TrainingPlanService.generatePlan(
+            athleteId: 42,
+            profile: profile,
+            scope: .initialCurrentWeek,
+            existingPlan: nil,
+            runningPlanGenerator: { runningPlan },
+            regenerationDate: Self.weekStart
+        )
+        let strength = try #require(plan.workouts.first { $0.workoutType.isStrength })
+
+        #expect(strength.targetPace == nil)
+        #expect(strength.distance == nil)
+    }
+
+    @Test("Widget details omit running pace for strength workouts")
+    @MainActor
+    func widgetDetailsOmitRunningPaceForStrength() throws {
+        let defaults = try #require(UserDefaults(suiteName: AppConstants.AppGroup.identifier))
+        defer { defaults.removeObject(forKey: WidgetPrescriptionSnapshot.cacheKey) }
+        let workout = DailyWorkout(
+            id: "legacy-strength",
+            date: Self.weekStart,
+            dayOfWeek: .sunday,
+            workoutType: .fullBody,
+            title: "Full Body",
+            description: "Strength session",
+            duration: 45,
+            distance: nil,
+            targetPace: "9:22/mi",
+            exercises: nil,
+            isCompleted: false,
+            completedActivityId: nil
+        )
+        let snapshot = BecomingSnapshot(
+            headline: "Train with intent",
+            detail: "Today's prescription",
+            recommendedChoice: .planned,
+            paths: []
+        )
+
+        WidgetSyncService.shared.updateBecomingData(
+            snapshot: snapshot,
+            workout: workout,
+            readinessScore: nil,
+            weatherTitle: nil,
+            weatherDetail: nil
+        )
+        let prescription = try #require(WidgetPrescriptionSnapshot.cached(in: defaults))
+
+        #expect(prescription.detail.contains("45"))
+        #expect(!prescription.detail.contains("/mi"))
+    }
+
     private static let calendar = Calendar(identifier: .gregorian)
     private static let weekStart = calendar.date(
         from: DateComponents(year: 2026, month: 8, day: 23)

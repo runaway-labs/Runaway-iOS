@@ -68,7 +68,8 @@ final class WidgetSyncService {
         defaults.set(snapshot.headline, forKey: "becoming_headline")
         defaults.set(snapshot.detail, forKey: "becoming_detail")
         defaults.set(workout?.title ?? "Today's training", forKey: "becoming_workout")
-        let dose = [workout?.formattedDuration, workout?.formattedDistance, workout?.targetPace]
+        let pace = workout?.workoutType.isRunning == true ? workout?.targetPace : nil
+        let dose = [workout?.formattedDuration, workout?.formattedDistance, pace]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         defaults.set(dose.isEmpty ? "Ready when you are" : dose, forKey: "becoming_workout_detail")
         if let workout {

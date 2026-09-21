@@ -1204,7 +1204,7 @@ class TrainingPlanService {
                     for: assignment,
                     profile: profile,
                     runningDistance: assignment.workoutType.isRunning ? addedRunDistance : nil,
-                    runningTargetPace: runningTemplate?.targetPace
+                    runningTargetPace: assignment.workoutType.isRunning ? runningTemplate?.targetPace : nil
                 )
             }
             return createWorkout(
