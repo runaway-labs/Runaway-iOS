@@ -52,4 +52,28 @@ struct CoachEvent: Codable, Equatable, Identifiable, Sendable {
             occurredAt.timeIntervalSince1970.isFinite &&
             receivedAt.timeIntervalSince1970.isFinite && receivedAt >= occurredAt
     }
+
+    static func remoteScheduledCheckIn(
+        from userInfo: [AnyHashable: Any],
+        authenticatedAthleteID: Int,
+        receivedAt: Date = Date()
+    ) -> Self? {
+        let payloadAthleteID = (userInfo["athlete_id"] as? Int)
+            ?? (userInfo["athlete_id"] as? String).flatMap(Int.init)
+        guard authenticatedAthleteID > 0,
+              payloadAthleteID == authenticatedAthleteID,
+              let rawEventID = userInfo["coach_event_id"] as? String,
+              let eventID = UUID(uuidString: rawEventID),
+              receivedAt.timeIntervalSince1970.isFinite else { return nil }
+        return Self(
+            id: eventID,
+            athleteID: authenticatedAthleteID,
+            kind: .scheduledCheckIn,
+            source: .schedule,
+            occurredAt: receivedAt,
+            receivedAt: receivedAt,
+            sourceRecordID: "schedule-\(eventID.uuidString)",
+            payload: .none
+        )
+    }
 }

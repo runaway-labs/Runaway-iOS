@@ -33,16 +33,24 @@ final class CoachEventService {
 
     @discardableResult
     static func persistRemotePayload(_ userInfo: [AnyHashable: Any], athleteID: Int) throws -> Bool {
-        let value = userInfo["coach_event"]
-        let data: Data
-        if let text = value as? String, let decoded = Data(base64Encoded: text) {
-            data = decoded
-        } else if let object = value as? [String: Any], JSONSerialization.isValidJSONObject(object) {
-            data = try JSONSerialization.data(withJSONObject: object)
+        let event: CoachEvent
+        if let scheduled = CoachEvent.remoteScheduledCheckIn(
+            from: userInfo,
+            authenticatedAthleteID: athleteID
+        ) {
+            event = scheduled
         } else {
-            return false
+            let value = userInfo["coach_event"]
+            let data: Data
+            if let text = value as? String, let decoded = Data(base64Encoded: text) {
+                data = decoded
+            } else if let object = value as? [String: Any], JSONSerialization.isValidJSONObject(object) {
+                data = try JSONSerialization.data(withJSONObject: object)
+            } else {
+                return false
+            }
+            event = try JSONDecoder().decode(CoachEvent.self, from: data)
         }
-        let event = try JSONDecoder().decode(CoachEvent.self, from: data)
         guard event.athleteID == athleteID else {
             throw ProtectedTrainingRepository.RepositoryError.ownershipMismatch
         }

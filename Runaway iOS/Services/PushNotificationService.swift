@@ -35,6 +35,20 @@ struct CoachNotificationCommand: Equatable {
     let actionIdentifier: String
 }
 
+struct ScheduledCoachNotificationCopy: Equatable {
+    let title: String
+    let body: String
+
+    init(workout: DailyWorkout) {
+        title = "Up next: \(workout.title)"
+        let pace = workout.workoutType.isRunning ? workout.targetPace : nil
+        let dose = [workout.formattedDuration, workout.formattedDistance, pace]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        body = dose.isEmpty ? "Open Runaway for today's plan." : dose.joined(separator: " · ")
+    }
+}
+
 @MainActor
 @Observable
 final class PushNotificationService {
@@ -181,6 +195,28 @@ final class PushNotificationService {
         guard let id, id > 0 else { return }
         pendingActivityID = id
         pendingWorkoutRoute = nil
+    }
+
+    func presentScheduledCoachRecommendation(for workout: DailyWorkout, eventID: UUID) async throws {
+        guard let athleteID = athleteID() else { return }
+        let copy = ScheduledCoachNotificationCopy(workout: workout)
+        let content = UNMutableNotificationContent()
+        content.title = copy.title
+        content.body = copy.body
+        content.sound = .default
+        content.categoryIdentifier = "RUNAWAY_COACH_AUTOMATIC"
+        content.userInfo = [
+            "athlete_id": athleteID,
+            "coach_event_id": eventID.uuidString,
+            "sync_type": "coach_event",
+        ]
+        try await UNUserNotificationCenter.current().add(
+            UNNotificationRequest(
+                identifier: "runaway-coach-schedule-\(eventID.uuidString)",
+                content: content,
+                trigger: nil
+            )
+        )
     }
 
     func takePendingCoachRoute() -> CoachNotificationRoute? {

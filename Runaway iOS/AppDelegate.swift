@@ -66,6 +66,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 }
                 do {
                     let saved = try CoachEventService.persistRemotePayload(userInfo, athleteID: athleteID)
+                    if saved,
+                       let event = CoachEvent.remoteScheduledCheckIn(
+                           from: userInfo,
+                           authenticatedAthleteID: athleteID
+                       ) {
+                        await DataManager.shared.loadCurrentWeeklyPlan()
+                        if let workout = DataManager.shared.currentWeeklyPlan?.workout(
+                            for: DayOfWeek.from(date: Date())
+                        ), !workout.isCompleted {
+                            try await PushNotificationService.shared.presentScheduledCoachRecommendation(
+                                for: workout,
+                                eventID: event.id
+                            )
+                        }
+                    }
                     completionHandler(saved ? .newData : .noData)
                 } catch {
                     completionHandler(.failed)
