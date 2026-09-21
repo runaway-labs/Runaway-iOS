@@ -125,6 +125,13 @@ struct DailyWorkout: Codable, Identifiable {
         }
         return "\(duration) min"
     }
+
+    /// Pace is a running prescription. Older cached plans may contain a running
+    /// pace after a workout was changed to another modality, so consumers must
+    /// use this semantic accessor instead of displaying the persisted field.
+    var displayTargetPace: String? {
+        workoutType.isRunning ? targetPace : nil
+    }
 }
 
 // MARK: - Exercise (for strength workouts)

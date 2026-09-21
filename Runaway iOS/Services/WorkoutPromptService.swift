@@ -19,6 +19,11 @@ struct WorkoutPromptDeviceRegistration: Encodable {
 
 @MainActor @Observable
 final class WorkoutPromptService {
+    private struct ExistingCoachSchedule: Decodable {
+        let id: UUID
+        let schedule_key: String
+    }
+
     static let shared = WorkoutPromptService()
     private(set) var settings: WorkoutPromptSettings?
     private(set) var accountID: Int?
@@ -49,10 +54,31 @@ final class WorkoutPromptService {
             draft.hour = first.hour; draft.minute = first.minute; draft.weekdays = first.weekdays
         }
         try await supabase.from("workout_prompt_settings").upsert(draft).execute()
+        try await syncCoachSchedules(for: draft)
         guard UserSession.shared.userId == draft.athlete_id else { return }
         settings = draft
         requestSync()
         if draft.enabled { await PushNotificationService.shared.activate() }
+    }
+
+    private func syncCoachSchedules(for settings: WorkoutPromptSettings) async throws {
+        let desired = CoachScheduleProjection.rows(from: settings)
+        let desiredKeys = Set(desired.map(\.schedule_key))
+        if !desired.isEmpty {
+            try await supabase.from("coach_event_schedules")
+                .upsert(desired, onConflict: "athlete_id,device_id,schedule_key")
+                .execute()
+        }
+
+        let existing: [ExistingCoachSchedule] = try await supabase.from("coach_event_schedules")
+            .select("id,schedule_key")
+            .eq("athlete_id", value: settings.athlete_id)
+            .like("schedule_key", pattern: "\(CoachScheduleProjection.keyPrefix)%")
+            .execute().value
+        for stale in existing where !desiredKeys.contains(stale.schedule_key) {
+            try await supabase.from("coach_event_schedules").delete()
+                .eq("id", value: stale.id).execute()
+        }
     }
 
     func publish(_ publication: WorkoutPromptPublication) async {

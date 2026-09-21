@@ -274,7 +274,7 @@ struct WorkoutDayCard: View {
                                 .font(.caption)
                                 .foregroundColor(AppTheme.Colors.textSecondary)
                         }
-                        if let pace = workout.targetPace {
+                        if let pace = workout.displayTargetPace {
                             Label(pace, systemImage: "speedometer")
                                 .font(.caption)
                                 .foregroundColor(AppTheme.Colors.textSecondary)
@@ -390,7 +390,7 @@ struct WorkoutDetailSheet: View {
                         }
                         if let effort = AcceptedPrescriptionCompletionPolicy.effortLabel(for: workout) {
                             DetailBox(title: "Effort", value: effort)
-                        } else if let pace = workout.targetPace {
+                        } else if let pace = workout.displayTargetPace {
                             DetailBox(title: "Pace", value: pace)
                         }
                     }

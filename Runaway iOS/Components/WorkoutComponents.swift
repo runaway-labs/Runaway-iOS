@@ -367,7 +367,7 @@ struct TodaysFocusCard: View {
                                         .font(.system(size: 12, weight: .medium, design: .rounded))
                                         .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                                 }
-                                if let pace = workout.targetPace {
+                                if let pace = workout.displayTargetPace {
                                     Text("·")
                                         .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
                                         .font(.system(size: 12))

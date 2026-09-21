@@ -678,7 +678,7 @@ struct TodayWorkoutCard: View {
                                 Text(d).font(AppTheme.Typography.body)
                                     .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                             }
-                            if let p = workout.targetPace {
+                            if let p = workout.displayTargetPace {
                                 Text("@ \(p)").font(AppTheme.Typography.body)
                                     .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                             }

@@ -52,6 +52,35 @@ struct WorkoutPromptSettings: Codable, Equatable {
     }
 }
 
+struct CoachEventScheduleWrite: Encodable, Equatable {
+    let athlete_id: Int
+    let device_id: UUID? = nil
+    let schedule_key: String
+    let enabled: Bool
+    let hour: Int
+    let minute: Int
+    let weekdays: [Int]
+    let timezone: String
+}
+
+enum CoachScheduleProjection {
+    static let keyPrefix = "workout-prompt:"
+
+    static func rows(from settings: WorkoutPromptSettings) -> [CoachEventScheduleWrite] {
+        settings.effectiveSchedules.map { schedule in
+            CoachEventScheduleWrite(
+                athlete_id: settings.athlete_id,
+                schedule_key: keyPrefix + schedule.id.uuidString.lowercased(),
+                enabled: settings.enabled,
+                hour: schedule.hour,
+                minute: schedule.minute,
+                weekdays: Array(Set(schedule.weekdays)).sorted(),
+                timezone: settings.timezone
+            )
+        }
+    }
+}
+
 struct WorkoutPromptRoute: Identifiable, Equatable {
     let id: UUID
     let athleteID: Int

@@ -54,6 +54,49 @@ final class CoachNotificationTests: XCTestCase {
         XCTAssertTrue(runningCopy.body.contains("9:22/mi"))
     }
 
+    func testNonRunningWorkoutNeverExposesRunningPace() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let walking = DailyWorkout(
+            id: "walk", date: date, dayOfWeek: .sunday, workoutType: .walking,
+            title: "Walking", description: "Easy movement", duration: 40,
+            distance: nil, targetPace: "9:22/mi", exercises: nil,
+            isCompleted: false, completedActivityId: nil
+        )
+        let running = DailyWorkout(
+            id: "run", date: date, dayOfWeek: .sunday, workoutType: .easyRun,
+            title: "Easy Run", description: "Aerobic work", duration: 35,
+            distance: 3.5, targetPace: "9:22/mi", exercises: nil,
+            isCompleted: false, completedActivityId: nil
+        )
+
+        XCTAssertNil(walking.displayTargetPace)
+        XCTAssertEqual(running.displayTargetPace, "9:22/mi")
+    }
+
+    func testSavedPromptTimesProjectIntoCoachSchedules() {
+        let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        var settings = WorkoutPromptSettings(athlete_id: 42)
+        settings.enabled = true
+        settings.timezone = "America/Chicago"
+        settings.schedules = [
+            WorkoutPromptSchedule(id: firstID, hour: 7, minute: 0, weekdays: [2, 4, 6]),
+            WorkoutPromptSchedule(id: secondID, hour: 17, minute: 30, weekdays: [1, 7]),
+        ]
+
+        let rows = CoachScheduleProjection.rows(from: settings)
+
+        XCTAssertEqual(rows.map(\.schedule_key), [
+            "workout-prompt:00000000-0000-0000-0000-000000000001",
+            "workout-prompt:00000000-0000-0000-0000-000000000002",
+        ])
+        XCTAssertEqual(rows.map(\.enabled), [true, true])
+        XCTAssertEqual(rows.map(\.hour), [7, 17])
+        XCTAssertEqual(rows.map(\.minute), [0, 30])
+        XCTAssertEqual(rows.map(\.weekdays), [[2, 4, 6], [1, 7]])
+        XCTAssertTrue(rows.allSatisfy { $0.athlete_id == 42 && $0.timezone == "America/Chicago" })
+    }
+
     func testMalformedDecisionIdentifierIsIgnored() {
         let service = PushNotificationService(athleteID: { 1 }, upload: { _, _ in })
         service.receiveNotification(["coach_decision_id": "not-a-uuid", "athlete_id": 1])

@@ -39,6 +39,7 @@ struct SettingsView: View {
     @State private var deleteAccountError: String?
     @State private var showingGoalSettings = false
     @State private var showingWorkoutNotifications = false
+    @State private var showingCoachActivity = false
     @State private var showingAthleteTrainingProfile = false
 
     private var colors: (background: Color, cardBg: Color, textPrimary: Color, textSecondary: Color) {
@@ -95,6 +96,13 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingWorkoutNotifications) {
                 if let athleteID = userSession.userId { WorkoutPromptSettingsView(athleteID: athleteID) }
+            }
+            .navigationDestination(isPresented: $showingCoachActivity) {
+                if let athleteID = userSession.userId {
+                    CoachActivityView(athleteID: athleteID)
+                } else {
+                    ContentUnavailableView("Sign in required", systemImage: "lock")
+                }
             }
             .sheet(isPresented: $showingAthleteTrainingProfile) {
                 if let athleteID = userSession.userId {
@@ -167,18 +175,18 @@ struct SettingsView: View {
 
             SettingsRow(
                 icon: "bell",
-                title: "Notifications",
+                title: "Workout notifications",
                 subtitle: PushNotificationService.shared.settingsSummary,
                 color: AppTheme.Colors.accent
             ) {
                 showingWorkoutNotifications = true
             }
 
-            NavigationLink(value: AppRouter.Route.coachActivity) {
-                SettingsRow(icon: "list.bullet.clipboard", title: "Coach Activity",
-                    subtitle: "Review plan changes, approvals, and Undo history",
-                    color: AppTheme.Colors.warmAmber) { }
-            }.buttonStyle(.plain)
+            SettingsRow(icon: "list.bullet.clipboard", title: "Coach Activity",
+                subtitle: "Review plan changes, approvals, and Undo history",
+                color: AppTheme.Colors.warmAmber) {
+                    showingCoachActivity = true
+                }
 
             SettingsRow(
                 icon: "location",
