@@ -550,13 +550,13 @@ git commit -m "feat: coordinate proactive coach delivery"
 - Consumes: Completed Tasks 1-8.
 - Produces: A verified release candidate, deployed deterministic Edge coordination, and physical-device evidence.
 
-- [ ] **Step 1: Run the complete iOS suite serially**
+- [x] **Step 1: Run the complete iOS suite serially**
 
 Run: `xcodebuild test -project 'Runaway iOS.xcodeproj' -scheme 'Runaway iOS' -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -parallel-testing-enabled NO -resultBundlePath /tmp/RunawayCoachAgent.xcresult`
 
 Expected: 0 failures; the existing device-only test may remain skipped with its explicit reason.
 
-- [ ] **Step 2: Run architectural boundary checks**
+- [x] **Step 2: Run architectural boundary checks**
 
 Run: `bash scripts/verify-no-activity-recorder.sh`
 
@@ -564,7 +564,7 @@ Run: `rg -n 'OpenAI|Anthropic|Gemini|chat/completions|responses/v1|api\.openai|a
 
 Expected: No production external-LLM client or endpoint. Test fixtures and documentation matches are reviewed rather than ignored.
 
-- [ ] **Step 3: Run Edge tests**
+- [x] **Step 3: Run Edge tests**
 
 From `runaway-edge`, run: `deno test supabase/functions/send-coach-events/policy.test.ts supabase/functions/send-workout-prompts/policy.test.ts supabase/functions/_shared/internal-handlers.test.ts`
 
@@ -574,7 +574,7 @@ Expected: PASS.
 
 Verify Today without the recorder FAB, automatic adaptation banner, pending proposal without active-plan replacement, Coach activity history, decision detail, Undo, Plan consistency, and widget snapshots.
 
-- [ ] **Step 5: Deploy migration and Edge Function**
+- [x] **Step 5: Deploy migration and Edge Function**
 
 Apply `20260920_coach_delivery.sql`, deploy `send-coach-events` with JWT verification disabled only for its internal-secret-protected endpoint, and confirm the internal job secret exists. Do not enable production scheduling until device registration publishes coach capability.
 
@@ -586,7 +586,7 @@ Verify HealthKit and Garmin imports, delayed catch-up, one automatic adaptation 
 
 Confirm one claimed row reaches `sent`, the device acknowledges it, and a duplicate delivery does not create a second decision. Keep legacy workout prompts enabled only for clients without coach capability.
 
-- [ ] **Step 8: Commit verification evidence separately**
+- [x] **Step 8: Commit verification evidence separately**
 
 In `Runaway iOS`:
 
