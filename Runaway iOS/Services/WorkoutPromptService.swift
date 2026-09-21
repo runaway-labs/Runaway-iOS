@@ -2,6 +2,21 @@ import Foundation
 import Observation
 import Supabase
 
+struct WorkoutPromptDeviceRegistration: Encodable {
+    let id: UUID
+    let athlete_id: Int
+    let token: String
+    let environment: String
+    let coach_capability_enabled = true
+
+    init(id: UUID, athleteID: Int, token: String, environment: String) {
+        self.id = id
+        self.athlete_id = athleteID
+        self.token = token
+        self.environment = environment
+    }
+}
+
 @MainActor @Observable
 final class WorkoutPromptService {
     static let shared = WorkoutPromptService()
@@ -56,7 +71,6 @@ final class WorkoutPromptService {
     }
 
     func register(token: String, athleteID: Int) async throws {
-        struct Device: Encodable { let id: UUID; let athlete_id: Int; let token: String; let environment: String }
         let key = "workout-prompt-installation.\(athleteID)"
         let id = UserDefaults.standard.string(forKey: key).flatMap(UUID.init(uuidString:)) ?? UUID()
         UserDefaults.standard.set(id.uuidString, forKey: key)
@@ -66,7 +80,12 @@ final class WorkoutPromptService {
         let environment = "production"
         #endif
         try await supabase.from("workout_prompt_devices")
-            .upsert(Device(id: id, athlete_id: athleteID, token: token, environment: environment)).execute()
+            .upsert(WorkoutPromptDeviceRegistration(
+                id: id,
+                athleteID: athleteID,
+                token: token,
+                environment: environment
+            )).execute()
     }
 
     func unregister(token: String, athleteID: Int) async throws {

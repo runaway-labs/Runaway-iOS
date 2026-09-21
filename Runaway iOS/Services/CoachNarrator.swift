@@ -49,8 +49,9 @@ struct CoachNarration: Equatable, Sendable {
 struct CoachNarrator {
     func explain(
         _ input: CoachDecisionNarrationInput,
-        generator: any CoachTextGenerating = FoundationModelsService.shared
+        generator suppliedGenerator: (any CoachTextGenerating)? = nil
     ) async -> CoachNarration {
+        let generator = suppliedGenerator ?? FoundationModelsService.shared
         let fallback = deterministicNarration(for: input)
         guard generator.isAvailable else { return fallback }
 

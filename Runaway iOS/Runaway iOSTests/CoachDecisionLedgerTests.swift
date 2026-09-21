@@ -182,7 +182,9 @@ final class CoachDecisionLedgerTests: XCTestCase {
             createdAt: original.createdAt,
             appliedAt: appliedAt,
             previousPlanData: original.previousPlanData,
-            appliedPlanFingerprint: original.appliedPlanFingerprint
+            appliedPlanFingerprint: state == .applied
+                ? (original.appliedPlanFingerprint ?? "test-applied-plan-fingerprint")
+                : original.appliedPlanFingerprint
         )
     }
 
