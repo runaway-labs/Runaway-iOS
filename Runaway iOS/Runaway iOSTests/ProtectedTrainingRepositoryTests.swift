@@ -356,6 +356,27 @@ extension ProtectedTrainingRepositoryTests {
         XCTAssertEqual(try repo.loadProfile(athleteID: 1), profile)
     }
 
+    func testGarminRunPreventsCompetingAppleHealthMirrorObservation() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repo = ProtectedTrainingRepository(root: root, activeAthleteID: { 1 })
+        let garmin = try importedActivity(["id": 420, "source": "garmin"])
+        let appleMirror = try importedActivity([
+            "id": 421,
+            "source": "apple_health",
+            "activity_date": "2023-11-14T22:14:20Z",
+            "distance": 4_950.0,
+            "elapsed_time": 1_830.0
+        ])
+
+        let result = try await TrainingEvidenceImportService.importRuns(
+            [appleMirror, garmin], athleteID: 1, repository: repo, now: evidenceNow)
+
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(try repo.currentObservations(athleteID: 1).count, 1)
+        XCTAssertEqual(try repo.currentObservations(athleteID: 1).first?.sourceRecordID, "activity:garmin:420")
+    }
+
     func testReimportPreservesCorrectionAndReportsChangedSourceForReview() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
