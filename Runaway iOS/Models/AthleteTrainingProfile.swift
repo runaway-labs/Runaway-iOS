@@ -1,5 +1,13 @@
 import Foundation
 
+enum AthleteOutcome: String, Codable, CaseIterable, Equatable {
+    case marathonReady
+    case leanStrong
+    case durableCore
+
+    static let defaults: [AthleteOutcome] = [.marathonReady, .leanStrong, .durableCore]
+}
+
 enum TrainingDiscipline: String, Codable, CaseIterable {
     case running, strength
 }
@@ -173,6 +181,7 @@ struct AthleteTrainingProfile: Codable, Equatable {
     var athleteID: Int
     var revision = UUID()
     var updatedAt = Date()
+    var outcomes: [AthleteOutcome]? = AthleteOutcome.defaults
     var goals: [AthleteTrainingGoal] = []
     var availability: [TrainingDayAvailability] = []
     var equipment: [StrengthEquipment] = []
@@ -183,7 +192,22 @@ struct AthleteTrainingProfile: Codable, Equatable {
         Set(goals.filter { $0.isActive && $0.priority == .equalPrimary }.map(\.discipline))
     }
 
-    var needsGoalSetup: Bool { !goals.contains(where: \.isActive) }
+    var resolvedOutcomes: [AthleteOutcome] { outcomes ?? AthleteOutcome.defaults }
+
+    var outcomeValidationMessage: String? {
+        resolvedOutcomes.isEmpty ? "Choose at least one training outcome." : nil
+    }
+
+    mutating func migrateLegacyGoalsToOutcomes() {
+        guard outcomes == nil else { return }
+        let activeDisciplines = Set(goals.filter(\.isActive).map(\.discipline))
+        var migrated: [AthleteOutcome] = []
+        if activeDisciplines.contains(.running) { migrated.append(.marathonReady) }
+        if activeDisciplines.contains(.strength) { migrated.append(.leanStrong) }
+        outcomes = migrated.isEmpty ? AthleteOutcome.defaults : migrated
+    }
+
+    var needsGoalSetup: Bool { resolvedOutcomes.isEmpty }
 
     func validationIssues() -> [TrainingProfileIssue] {
         var issues: [TrainingProfileIssue] = []
@@ -192,6 +216,7 @@ struct AthleteTrainingProfile: Codable, Equatable {
         }
         if schemaVersion != Self.currentSchemaVersion { issue("schemaVersion", "This profile version is not supported.") }
         if athleteID <= 0 { issue("athleteID", "Sign in to save your training profile.") }
+        if let outcomeValidationMessage { issue("outcomes", outcomeValidationMessage) }
         if Set(goals.map(\.id)).count != goals.count { issue("goals", "Goal identifiers must be unique.") }
         let raceIDs = goals.compactMap(\.sourceRaceID)
         if Set(raceIDs).count != raceIDs.count { issue("goals", "A race is already linked to another goal.") }

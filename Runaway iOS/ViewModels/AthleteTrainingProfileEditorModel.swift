@@ -35,6 +35,7 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
             let saved = try store.load(athleteID: athleteID)
             let evidence = try repository.currentObservations(athleteID: athleteID)
             var profile = saved ?? AthleteTrainingProfile(athleteID: athleteID)
+            profile.migrateLegacyGoalsToOutcomes()
             for day in 1...7 where !profile.availability.contains(where: { $0.weekday == day }) {
                 profile.availability.append(TrainingDayAvailability(weekday: day, availableMinutes: 0))
             }
