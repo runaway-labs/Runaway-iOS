@@ -65,4 +65,13 @@ struct AthleteOutcomeTests {
         #expect(profile.outcomes == [.marathonReady, .leanStrong])
         #expect(profile.goals == [running, strength])
     }
+
+    @Test("Outcome cards use athlete language instead of storage metrics")
+    func outcomePresentationIsHumanReadable() {
+        #expect(AthleteOutcome.marathonReady.title == "Marathon Ready")
+        #expect(AthleteOutcome.leanStrong.title == "Lean + Strong")
+        #expect(AthleteOutcome.durableCore.title == "Strong, Durable Core")
+        #expect(AthleteOutcome.marathonReady.detail.contains("race date") == false)
+        #expect(AthleteOutcome.leanStrong.detail.contains("bench") == false)
+    }
 }

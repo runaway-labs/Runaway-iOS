@@ -68,7 +68,6 @@ struct SettingsView: View {
                 VStack(spacing: AppTheme.Spacing.lg) {
                     profileSection
                     appSettingsSection
-                    goalsSection
                     integrationsSection
                     supportSection
                     #if DEBUG

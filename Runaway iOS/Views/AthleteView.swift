@@ -116,15 +116,13 @@ struct AthleteView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         EyebrowLabel(text: "ACCOUNT")
                         VStack(spacing: 0) {
-                            AccountRow(icon: "target", title: "Running goals", subtitle: "Weekly and monthly distance", action: { showingRunningGoals = true })
-                            Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
                             AccountRow(icon: "bolt.fill", title: "Strava", subtitle: stravaSubtitle)
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
                             AccountRow(icon: "watch.analog", title: "Devices & sensors", subtitle: deviceSubtitle, action: {
                                 performAccountAction(for: .devicesAndSensors)
                             })
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
-                            AccountRow(icon: "chart.bar.fill", title: "Training preferences", subtitle: trainingPreferencesSubtitle, action: {
+                            AccountRow(icon: "chart.bar.fill", title: "Training Profile", subtitle: "Marathon readiness, strength, core & schedule", action: {
                                 performAccountAction(for: .trainingPreferences)
                             })
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
@@ -160,7 +158,11 @@ struct AthleteView: View {
         }
         .sheet(isPresented: $showingRunningGoals) { GoalSettingsView() }
         .sheet(isPresented: $showingTrainingPreferences) {
-            TrainingProfileView(route: TrainingProfileRoute(store: trainingProfileStore))
+            if let athleteID = athlete.id {
+                AthleteTrainingProfileView(athleteID: athleteID)
+            } else {
+                ContentUnavailableView("Sign in required", systemImage: "lock")
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: MilestoneService.didUpdateNotification)) { _ in
             guard let athleteId = athlete.id else { return }

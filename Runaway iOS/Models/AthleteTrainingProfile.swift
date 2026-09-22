@@ -6,6 +6,33 @@ enum AthleteOutcome: String, Codable, CaseIterable, Equatable {
     case durableCore
 
     static let defaults: [AthleteOutcome] = [.marathonReady, .leanStrong, .durableCore]
+
+    var title: String {
+        switch self {
+        case .marathonReady: return "Marathon Ready"
+        case .leanStrong: return "Lean + Strong"
+        case .durableCore: return "Strong, Durable Core"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .marathonReady:
+            return "Build the aerobic base, long-run durability, and speed to be ready for a marathon block."
+        case .leanStrong:
+            return "Develop an athletic, muscular physique without sacrificing running performance."
+        case .durableCore:
+            return "Progress trunk strength and stability that support running, lifting, and resilience."
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .marathonReady: return "figure.run"
+        case .leanStrong: return "dumbbell.fill"
+        case .durableCore: return "figure.core.training"
+        }
+    }
 }
 
 enum TrainingDiscipline: String, Codable, CaseIterable {

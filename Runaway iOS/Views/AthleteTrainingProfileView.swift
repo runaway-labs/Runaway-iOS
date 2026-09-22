@@ -7,6 +7,7 @@ struct AthleteTrainingProfileView: View {
     @StateObject private var model: AthleteTrainingProfileEditorModel
     @State private var editingGoal: AthleteTrainingGoal?
     @State private var showingStrengthSet = false
+    @State private var showingBenchmarks = false
     @State private var confirmingImport = false
     @State private var sessionPreview: TrainingSessionPreviewSnapshot?
     @State private var previewError: String?
@@ -20,23 +21,24 @@ struct AthleteTrainingProfileView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("BUILT FROM WHAT YOU DO")
+                        Text("BUILT AROUND WHO YOU'RE BECOMING")
                             .font(AppTheme.Typography.caption).foregroundStyle(.teal)
-                        Text("Your ambition.\nYour starting line.")
+                        Text("One profile.\nA smarter training week.")
                             .font(AppTheme.Typography.title)
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Keep running and strength side by side. Give each goal a measurable finish line and keep actual performance separate.")
+                        Text("Choose the outcomes that matter. Runaway turns them into measurable running, strength, and recovery decisions.")
                             .font(AppTheme.Typography.subheadline).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }.padding(.vertical, 8)
-                    Label("Local to this iPhone", systemImage: "lock.shield")
+                    Label("Protected on device · Synced securely", systemImage: "lock.shield")
                         .font(.footnote).foregroundStyle(.secondary)
-                    Text("Your goals and completed work support specific session proposals. Review and accept a proposal to update a future day and the remaining week. Your existing activity mix still guides weekly scheduling; the new prescription flow is not yet connected to widgets or workout notifications.")
+                    Text("Outcomes guide the plan. Benchmarks improve precision, but they are optional and never replace what you are training to become.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 if model.loaded {
-                    goalsSection
+                    outcomesSection
+                    benchmarksSection
                     availabilitySection
                     equipmentSection
                     bodySection
@@ -48,14 +50,15 @@ struct AthleteTrainingProfileView: View {
                         } label: {
                             Label("Preview sessions", systemImage: "list.bullet.rectangle")
                         }
-                        .disabled(model.isImporting)
+                        .disabled(model.isImporting || model.isSaving)
                         .accessibilityIdentifier("previewGoalSessions")
                     } footer: {
                         Text("Review running and strength options, then use Compare with Next Up to inspect progression and accept a future session. Browsing or saving your profile does not change the plan automatically.")
                     }
                     Section {
-                        Button("Save profile") { model.save() }
+                        Button(model.isSaving ? "Saving & syncing..." : "Save Training Profile") { model.save() }
                             .font(.headline)
+                            .disabled(model.isSaving)
                     } footer: {
                         Text("Profile edits remain a draft until saved. Imported runs and recorded sets are saved separately when you confirm those actions.")
                     }
@@ -91,7 +94,7 @@ struct AthleteTrainingProfileView: View {
             .background(LinearGradient(colors: [AppTheme.Colors.adaptiveBackground,
                 Color.teal.opacity(0.07)], startPoint: .top, endPoint: .bottom))
             .tint(.teal)
-            .navigationTitle("Goals & current ability")
+            .navigationTitle("Training Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
@@ -132,32 +135,64 @@ struct AthleteTrainingProfileView: View {
         }
     }
 
-    private var goalsSection: some View {
+    private var outcomesSection: some View {
         Section {
-            ForEach([TrainingDiscipline.running, .strength], id: \.self) { discipline in
-                let goals = model.draft.goals.filter { $0.discipline == discipline }
-                Label(discipline == .running ? "Running" : "Strength",
-                      systemImage: discipline == .running ? "figure.run" : "dumbbell.fill")
-                    .font(.headline).foregroundStyle(discipline == .running ? Color.blue : Color.teal)
-                if goals.isEmpty { Text("No measurable target yet").foregroundStyle(.secondary) }
-                ForEach(goals) { goal in
+            ForEach(AthleteOutcome.allCases, id: \.self) { outcome in
+                Button { toggle(outcome) } label: {
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: outcome.systemImage)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(isSelected(outcome) ? Color.orange : Color.secondary)
+                            .frame(width: 34, height: 34)
+                            .background((isSelected(outcome) ? Color.orange : Color.secondary).opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(outcome.title).font(.headline).foregroundStyle(.primary)
+                            Text(outcome.detail).font(.subheadline).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: isSelected(outcome) ? "checkmark.circle.fill" : "circle")
+                            .font(.title3).foregroundStyle(isSelected(outcome) ? Color.teal : Color.secondary)
+                    }
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            if let message = model.draft.outcomeValidationMessage {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.orange)
+            }
+        } header: { Text("Your outcomes") }
+          footer: { Text("Choose at least one. These outcomes share priority; recovery and recent work determine the right session each day.") }
+    }
+
+    private var benchmarksSection: some View {
+        Section {
+            DisclosureGroup(isExpanded: $showingBenchmarks) {
+                if model.draft.goals.isEmpty {
+                    Text("No benchmarks yet. Runaway can still build your plan from completed activities.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(model.draft.goals) { goal in
                     Button { editingGoal = goal } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(goal.title).foregroundStyle(.primary)
                             Text(goalSummary(goal)).font(.subheadline).foregroundStyle(.secondary)
-                            Text(goal.isActive ? (goal.priority == .equalPrimary ? "Equal priority" : "Supporting") : "Inactive")
-                                .font(.caption).foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            }
-            Menu("Add measurable goal", systemImage: "plus.circle") {
-                ForEach(TrainingGoalMetric.allCases, id: \.self) { metric in
-                    Button(metric.editorTitle) { addGoal(metric) }
+                Menu("Add optional benchmark", systemImage: "plus.circle") {
+                    ForEach(TrainingGoalMetric.allCases, id: \.self) { metric in
+                        Button(metric.editorTitle) { addGoal(metric) }
+                    }
                 }
+            } label: {
+                Label("Performance benchmarks", systemImage: "chart.line.uptrend.xyaxis")
             }
-        } header: { Text("Goals") }
-          footer: { Text("Tap a goal to edit it or make it inactive. New goals keep the distance unit selected in Settings; changing Settings later does not relabel saved goals.") }
+        } footer: {
+            Text("Benchmarks help Runaway choose starting paces, repetitions, and loads. They are supporting evidence, not separate goals you must pursue.")
+        }
     }
 
     private var availabilitySection: some View {
@@ -174,7 +209,7 @@ struct AthleteTrainingProfileView: View {
                     }
                 }
             }
-        } header: { Text("Weekly availability") }
+        } header: { Text("Weekly rhythm") }
           footer: { Text("Set the time you can realistically train. Zero means unavailable. Two sessions share the day's total time budget and are always opt-in.") }
     }
 
@@ -240,6 +275,20 @@ struct AthleteTrainingProfileView: View {
         goal.enteredDistanceUnit = UnitPreferences.shared.isMetric ? .kilometers : .miles
         goal.enteredLoadUnit = UnitPreferences.shared.isMetric ? .kilograms : .pounds
         editingGoal = goal
+    }
+
+    private func isSelected(_ outcome: AthleteOutcome) -> Bool {
+        model.draft.resolvedOutcomes.contains(outcome)
+    }
+
+    private func toggle(_ outcome: AthleteOutcome) {
+        var selected = model.draft.resolvedOutcomes
+        if let index = selected.firstIndex(of: outcome) {
+            selected.remove(at: index)
+        } else {
+            selected.append(outcome)
+        }
+        model.draft.outcomes = AthleteOutcome.allCases.filter(selected.contains)
     }
 
     private func goalSummary(_ goal: AthleteTrainingGoal) -> String {
