@@ -10,6 +10,11 @@ actor BiometricService {
     private let initialBackfillVersion = 2
     private var isSyncing = false
 
+    func recentBiometrics(athleteID: Int, limit: Int = 30) async throws -> [AthleteBiometric] {
+        try await supabase.from("athlete_biometrics").select().eq("athlete_id", value: athleteID)
+            .order("entry_date", ascending: false).limit(max(1, min(limit, 90))).execute().value
+    }
+
     func syncHealthData() async {
         guard !isSyncing else { return }
         guard let athleteId = await UserSession.shared.userId else { return }

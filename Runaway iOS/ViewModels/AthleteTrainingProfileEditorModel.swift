@@ -54,7 +54,7 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
             try store.save(draft, athleteID: athleteID)
             if let saved = store.profile { draft = saved }
             errorMessage = nil
-            receipt = "Profile saved on this iPhone. Your existing plan is unchanged."
+            receipt = "Profile saved securely. Runaway will sync it without changing your current plan."
         } catch { errorMessage = error.localizedDescription }
     }
 

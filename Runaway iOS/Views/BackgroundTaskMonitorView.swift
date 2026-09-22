@@ -10,6 +10,11 @@ import SwiftUI
 struct BackgroundTaskMonitorView: View {
     @State private var realtimeService = RealtimeService.shared
     @State private var showingDetails = false
+    #if DEBUG
+    @StateObject private var athleteStateService = AthleteStateService()
+    @StateObject private var trainingProfileStore = TrainingProfileStore()
+    @StateObject private var readinessService = ReadinessService.shared
+    #endif
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -30,6 +35,10 @@ struct BackgroundTaskMonitorView: View {
             
             // Performance Metrics
             performanceMetricsCard
+
+            #if DEBUG
+            athleteStateComparisonCard
+            #endif
             
             // Controls
             controlsSection
@@ -40,7 +49,66 @@ struct BackgroundTaskMonitorView: View {
         .sheet(isPresented: $showingDetails) {
             BackgroundTaskDetailsView()
         }
+        #if DEBUG
+        .task {
+            guard let athleteID = UserSession.shared.userId else { return }
+            try? await athleteStateService.refresh(athleteID: athleteID)
+        }
+        #endif
     }
+
+    #if DEBUG
+    private var athleteStateComparisonCard: some View {
+        let plan = DataManager.shared.currentWeeklyPlan
+        let planned = plan?.isCurrentWeek == true ? plan?.workout(for: Date()) : nil
+        let active = TodayRecommendationExplanation.evaluate(
+            date: Date(), profile: trainingProfileStore.profile, plannedWorkout: planned,
+            planWorkouts: plan?.workouts ?? [], activities: DataManager.shared.activities,
+            readinessScore: readinessService.todaysReadiness?.score
+        ).recommendation
+        let shadow = athleteStateService.shadowPrescription
+        let shadowKind = shadow?.prescription.kind.capitalized ?? "Unavailable"
+        let activeKind = active.workoutType?.isRunning == true ? "Run"
+            : active.workoutType?.isStrength == true ? "Strength" : active.title
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Label("Athlete state shadow", systemImage: "waveform.path.ecg.rectangle")
+                .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.accent)
+            comparisonRow("Active Today", activeKind)
+            comparisonRow("Shadow", shadowKind)
+            comparisonRow("Difference", activeKind.caseInsensitiveCompare(shadowKind) == .orderedSame
+                ? "Same discipline" : "Different discipline")
+            if let shadow {
+                comparisonRow("Policy", shadow.policyVersion)
+                comparisonRow("Confidence", shadow.confidence.rawValue.capitalized)
+                comparisonRow("Fingerprint", String(shadow.inputFingerprint.prefix(12)))
+            }
+            if let state = athleteStateService.snapshot {
+                comparisonRow("State", "\(state.recoveryDirection.rawValue) · \(state.intensityCap.rawValue)")
+                comparisonRow("Missing", state.missingSignals.isEmpty ? "None" : state.missingSignals.joined(separator: ", "))
+                Text(state.isStale() ? "State is stale; last-known-good remains visible." : "State is current.")
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(state.isStale() ? AppTheme.Colors.warning : AppTheme.Colors.success)
+            }
+            Text("Internal comparison only. Today and Plan still use the active on-device engine.")
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)
+        }
+        .padding()
+        .background(AppTheme.Colors.adaptiveCardBackground)
+        .cornerRadius(AppTheme.CornerRadius.large)
+    }
+
+    private func comparisonRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label).foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)
+            Spacer()
+            Text(value).multilineTextAlignment(.trailing)
+        }
+        .font(AppTheme.Typography.caption)
+    }
+    #endif
     
     private var connectionStatusCard: some View {
         VStack(alignment: .leading, spacing: 12) {

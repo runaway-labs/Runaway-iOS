@@ -26,14 +26,17 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
     private let repository: ProtectedTrainingRepository
     private let legacyDefaults: UserDefaults
     private let activeAthleteID: @MainActor () -> Int?
+    private let remote: AthleteTrainingProfileRemotePersisting
     private var sessionSubscription: AnyCancellable?
+    private var syncTask: Task<Void, Never>?
 
     init(defaults: UserDefaults = .standard, root: URL? = nil,
          activeAthleteID: @escaping @MainActor () -> Int? = {
              UserSession.shared.isReady ? UserSession.shared.userId : nil
-         }) {
+         }, remote: AthleteTrainingProfileRemotePersisting? = nil) {
         self.legacyDefaults = defaults
         self.activeAthleteID = activeAthleteID
+        self.remote = remote ?? AthleteTrainingProfileRemoteService()
         self.repository = ProtectedTrainingRepository(root: root, activeAthleteID: activeAthleteID)
         // UserSession emits synchronously from the main actor before replacing identity.
         sessionSubscription = NotificationCenter.default.publisher(for: .trainingSessionInvalidated)
@@ -48,6 +51,7 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
         accountID = athleteID
         let loaded = try repository.loadProfile(athleteID: athleteID)
         storedProfile = loaded
+        if let loaded { queueRemoteSync(loaded) }
         return loaded
     }
 
@@ -62,6 +66,7 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
         try repository.saveProfile(saved, athleteID: athleteID)
         accountID = athleteID
         storedProfile = saved
+        queueRemoteSync(saved)
     }
 
     /// Explicit, owner-checked migration of this feature's previous v2 preference blob.
@@ -80,8 +85,23 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
     }
 
     func clearSession() {
+        syncTask?.cancel()
+        syncTask = nil
         storedProfile = nil
         accountID = nil
+    }
+
+    private func queueRemoteSync(_ profile: AthleteTrainingProfile) {
+        syncTask?.cancel()
+        syncTask = Task { [remote] in
+            do { _ = try await remote.save(profile, activeAthleteID: profile.athleteID) }
+            catch is CancellationError { }
+            catch {
+                #if DEBUG
+                print("AthleteTrainingProfileStore: remote sync deferred")
+                #endif
+            }
+        }
     }
 
     private func requireOwner(_ athleteID: Int) throws {
