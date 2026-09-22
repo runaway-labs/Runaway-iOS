@@ -96,9 +96,17 @@ struct WorkoutPromptRoute: Identifiable, Equatable {
 }
 
 struct WorkoutPromptContent: Codable {
+    enum State: String, Codable {
+        case recommended
+        case committed
+        case completed
+    }
+
     let workout: DailyWorkout
     let whyToday: String
     let recommendationOnly: Bool
+    var state: State? = nil
+    var prescriptionFingerprint: String? = nil
 }
 
 struct WorkoutPromptItem: Encodable {
@@ -157,18 +165,39 @@ struct WorkoutPromptPublication: Encodable {
             recommendation: recommendation, plannedWorkout: todayPlan, date: now
         )
         var contents: [WorkoutPromptContent] = []
-        if let recommended {
-            contents.append(WorkoutPromptContent(
+        if let committed = todayPlan, committed.commitment != nil {
+            let completion = CommittedWorkoutCompletionPolicy.status(
+                workout: committed, evidence: activities, calendar: calendar
+            )
+            if completion != .complete {
+                var content = WorkoutPromptContent(
+                    workout: committed,
+                    whyToday: "You committed to this exact workout. Runaway will keep the rest of the week aligned around it.",
+                    recommendationOnly: false
+                )
+                content.state = .committed
+                content.prescriptionFingerprint = committed.commitment?.prescriptionFingerprint
+                contents.append(content)
+            }
+        } else if let recommended {
+            var content = WorkoutPromptContent(
                 workout: recommended, whyToday: recommendation.reason ?? recommendation.detail,
                 recommendationOnly: recommended.id != todayPlan?.id
-            ))
+            )
+            content.state = .recommended
+            contents.append(content)
         }
         let end = calendar.date(byAdding: .day, value: 7, to: today) ?? today
         contents += planned.filter { $0.date > today && $0.date <= end && !calendar.isDate($0.date, inSameDayAs: now) }
             .sorted { $0.date < $1.date }
-            .map { WorkoutPromptContent(workout: $0,
-                whyToday: "From your training plan. Check today's recovery before starting; you can adjust the session and rebalance your week.",
-                recommendationOnly: false) }
+            .map {
+                var content = WorkoutPromptContent(workout: $0,
+                    whyToday: "From your training plan. Check today's recovery before starting; Performance Coach can rebalance the week before you commit.",
+                    recommendationOnly: false)
+                content.state = $0.commitment == nil ? .recommended : .committed
+                content.prescriptionFingerprint = $0.commitment?.prescriptionFingerprint
+                return content
+            }
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")

@@ -654,6 +654,7 @@ struct ComplementarySchedulingPolicyTests {
         WidgetSyncService.shared.updateBecomingData(
             snapshot: snapshot,
             workout: workout,
+            activities: [],
             readinessScore: nil,
             weatherTitle: nil,
             weatherDetail: nil
@@ -662,6 +663,37 @@ struct ComplementarySchedulingPolicyTests {
 
         #expect(prescription.detail.contains("45"))
         #expect(!prescription.detail.contains("/mi"))
+    }
+
+    @Test("Widget prescription uses recorded activity completion")
+    @MainActor
+    func widgetPrescriptionUsesRecordedActivityCompletion() throws {
+        let defaults = try #require(UserDefaults(suiteName: AppConstants.AppGroup.identifier))
+        defer { defaults.removeObject(forKey: WidgetPrescriptionSnapshot.cacheKey) }
+        let date = Calendar.current.startOfDay(for: Date())
+        var workout = DailyWorkout(
+            id: "today", date: date, dayOfWeek: .from(date: date), workoutType: .easyRun,
+            title: "Run", description: "Conversational", duration: 40, distance: 6,
+            targetPace: nil, exercises: nil, isCompleted: false, completedActivityId: nil
+        )
+        workout.commitment = WorkoutCommitment(
+            committedAt: date, source: .recommendation,
+            prescriptionFingerprint: try WorkoutPrescriptionFingerprint.make(workout),
+            originalWorkoutID: workout.id
+        )
+        let run = Activity(id: 92, name: "Run", type: "Run", distance: 9_656.064,
+                           elapsed_time: 2_400, activity_date: date.addingTimeInterval(3_600).timeIntervalSince1970)
+        let snapshot = BecomingSnapshot(
+            headline: "Work complete", detail: "Six miles recorded",
+            recommendedChoice: .planned, paths: []
+        )
+
+        WidgetSyncService.shared.updateBecomingData(
+            snapshot: snapshot, workout: workout, activities: [run], readinessScore: nil,
+            weatherTitle: nil, weatherDetail: nil
+        )
+
+        #expect(WidgetPrescriptionSnapshot.cached(in: defaults)?.status == .completed)
     }
 
     private static let calendar = Calendar(identifier: .gregorian)

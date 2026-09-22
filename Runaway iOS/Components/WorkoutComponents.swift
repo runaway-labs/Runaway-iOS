@@ -18,6 +18,11 @@ enum TodayActivityCompletionPolicy {
                 return false
             }
             guard let plannedWorkout else { return true }
+            if plannedWorkout.commitment != nil {
+                return CommittedWorkoutCompletionPolicy.status(
+                    workout: plannedWorkout, evidence: activities, calendar: calendar
+                ) == .complete && activity.isCompatible(with: plannedWorkout.workoutType)
+            }
             return activity.isCompatible(with: plannedWorkout.workoutType)
         }
     }
@@ -38,6 +43,7 @@ struct TodaysFocusCard: View {
     @StateObject private var nativeContext = NativeTrainingContextService.shared
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
     @State private var showingTrainingDecision = false
+    @State private var decisionStartsWithChoices = false
     @State private var showingWorkoutDetails = false
     @State private var showingRecordedWorkout: DailyWorkout?
     @State private var preferredBecomingChoice: BecomingChoice?
@@ -257,7 +263,7 @@ struct TodaysFocusCard: View {
                         .background(AppTheme.Colors.success.opacity(0.15))
                         .clipShape(Capsule())
                 case .plannedWorkout(_, let presentation):
-                    Text(presentation.badgeText)
+                    Text(todaysWorkout?.commitment == nil ? presentation.badgeText : "Committed")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(activityAccent(for: presentation.accent))
                         .padding(.horizontal, 8)
@@ -404,7 +410,7 @@ struct TodaysFocusCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("View \(workout.title)")
-                .accessibilityHint("Opens the workout breakdown. Use Adjust today to change your session.")
+                .accessibilityHint("Opens the workout breakdown. Use Performance Coach to commit or choose another session.")
 
             case .readyToRun:
                 HStack(spacing: 12) {
@@ -501,7 +507,7 @@ struct TodaysFocusCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("View \(recommendation.title)")
-                .accessibilityHint("Opens today's recommendation. Use Adjust today to change your session.")
+                .accessibilityHint("Opens today's recommendation. Use Performance Coach to commit or choose another session.")
             }
 
             if let workout = todaysWorkout,
@@ -516,22 +522,27 @@ struct TodaysFocusCard: View {
 
 
             if shouldOfferTrainingDecision {
-                Button { presentTrainingDecision() } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "slider.horizontal.3")
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(isApplyingAdjustment ? "Updating your week..." : "Adjust today")
-                                .font(.system(.subheadline, design: .rounded, weight: .bold))
-                            Text("Choose a session and rebalance the week")
-                                .font(.caption).foregroundStyle(TrainingProgressStyle.secondary)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.caption)
-                    }.foregroundStyle(TrainingProgressStyle.blue)
-                        .padding(14).frame(minHeight: 56)
-                        .background(TrainingProgressStyle.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
-                }.buttonStyle(.plain).disabled(isApplyingAdjustment)
-                    .accessibilityIdentifier("adjustTodayButton")
+                VStack(spacing: 9) {
+                    Button { presentDailyDecision(showChoices: false) } label: {
+                        Label(todaysWorkout?.commitment == nil ? "Commit to this workout" : "View committed workout",
+                              systemImage: todaysWorkout?.commitment == nil ? "bolt.fill" : "checkmark.seal.fill")
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.black)
+                    .background(TrainingProgressStyle.amber, in: RoundedRectangle(cornerRadius: 14))
+                    .accessibilityIdentifier("performanceCoachPrimaryAction")
+
+                    Button { presentDailyDecision(showChoices: true) } label: {
+                        Text(todaysWorkout?.commitment == nil ? "Choose something else" : "Change")
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(TrainingProgressStyle.blue)
+                    .accessibilityIdentifier("performanceCoachChoicesAction")
+                }
             }
 
             if let receipt = changeReceipt {
@@ -609,16 +620,13 @@ struct TodaysFocusCard: View {
             }
         }
         .sheet(isPresented: $showingTrainingDecision) {
-            if let workout = decisionWorkout {
-                TrainingDecisionSheet(
-                    workout: workout,
-                    recommendation: decisionRecommendation,
-                    workoutAlternatives: trainingAlternatives,
-                    needsTrainingProfile: trainingProfileStore.needsPersonalization,
-                    preferredChoice: preferredBecomingChoice
-                ) { adjustment in
-                    Task { await applyTrainingDecision(adjustment) }
-                }
+            if let workout = decisionWorkout, let plan = dataManager.currentWeeklyPlan {
+                TodayWorkoutDecisionSheet(
+                    plan: plan,
+                    profile: trainingProfileStore.profile,
+                    recommendedWorkout: workout,
+                    startChoosing: decisionStartsWithChoices
+                )
             }
         }
         .sheet(item: $showingRecordedWorkout) { WorkoutDetailSheet(workout: $0) }
@@ -684,6 +692,11 @@ struct TodaysFocusCard: View {
 
     private func presentTrainingDecision(preferredChoice: BecomingChoice? = nil) {
         preferredBecomingChoice = preferredChoice
+        presentDailyDecision(showChoices: preferredChoice == .alternate)
+    }
+
+    private func presentDailyDecision(showChoices: Bool) {
+        decisionStartsWithChoices = showChoices
         showingTrainingDecision = true
     }
 
@@ -691,7 +704,10 @@ struct TodaysFocusCard: View {
         [becomingSnapshot.headline, String(describing: becomingSnapshot.recommendedChoice),
          String(readinessService.todaysReadiness?.score ?? -1), decisionWorkout?.id ?? "none",
          decisionWorkout?.acceptedCompletion?.status ?? "scheduled",
-         String(decisionWorkout?.isCompleted == true), weatherGuidance?.title ?? ""].joined(separator: "|")
+         decisionWorkout?.commitment?.prescriptionFingerprint ?? "uncommitted",
+         String(decisionWorkout?.isCompleted == true),
+         dataManager.activities.map { String($0.id) }.joined(separator: ","),
+         weatherGuidance?.title ?? ""].joined(separator: "|")
     }
 
     @MainActor
@@ -699,6 +715,7 @@ struct TodaysFocusCard: View {
         WidgetSyncService.shared.updateBecomingData(
             snapshot: becomingSnapshot,
             workout: decisionWorkout,
+            activities: dataManager.activities,
             readinessScore: readinessService.todaysReadiness?.score,
             weatherTitle: weatherGuidance?.title,
             weatherDetail: weatherGuidance?.detail

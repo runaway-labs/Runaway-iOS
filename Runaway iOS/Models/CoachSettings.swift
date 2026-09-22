@@ -90,8 +90,11 @@ struct CoachSettings: Codable {
 
     // MARK: - Identity Voice Cues
 
-    /// Play personalized identity cues during runs (requires MindsetProfile to be set)
-    var enableIdentityVoiceCues: Bool = true
+    /// Retained as a decoding-compatible no-op after Running Mindset was retired.
+    var enableIdentityVoiceCues: Bool {
+        get { false }
+        set { }
+    }
 
     // MARK: - Voice Settings
 

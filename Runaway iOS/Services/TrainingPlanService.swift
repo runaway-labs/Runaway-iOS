@@ -369,7 +369,11 @@ class TrainingPlanService {
         profile: TrainingProfile? = nil
     ) async throws -> WeeklyTrainingPlan {
         _ = athleteId
-        let completedPlan = anchoringCompletedActivities(completedActivities, to: currentPlan)
+        let completedPlan = reconciledPlan(
+            currentPlan: currentPlan,
+            completedActivities: completedActivities,
+            now: Date()
+        )
         let activityAdjustedPlan = adjustPlanLocally(
             currentPlan: completedPlan,
             completedActivities: completedActivities
@@ -383,7 +387,11 @@ class TrainingPlanService {
             existingPlan: activityAdjustedPlan,
             goal: goal
         )
-        return adjusted
+        return reconciledPlan(
+            currentPlan: adjusted,
+            completedActivities: completedActivities,
+            now: Date()
+        )
     }
 
     /// Check if plan regeneration is needed based on activity differences
@@ -408,6 +416,11 @@ class TrainingPlanService {
             // No planned workout - might want to regenerate to add recovery
             let activityDistance = (newActivity.distance ?? 0) * 0.000621371
             return activityDistance > 3.0 // Regenerate if unplanned run > 3 miles
+        }
+
+        if workoutType(for: newActivity) != nil,
+           !newActivity.isCompatible(with: plannedWorkout.workoutType) {
+            return true
         }
 
         // Compare actual vs planned
@@ -443,6 +456,79 @@ class TrainingPlanService {
         }
 
         return false
+    }
+
+    static func reconciledPlan(
+        currentPlan: WeeklyTrainingPlan,
+        completedActivities: [Activity],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> WeeklyTrainingPlan {
+        let anchored = anchoringCompletedActivities(
+            completedActivities,
+            to: currentPlan,
+            calendar: calendar
+        )
+        let today = calendar.startOfDay(for: now)
+        var workouts = anchored.workouts
+        let historical = workouts.indices
+            .filter { calendar.startOfDay(for: workouts[$0].date) <= today }
+            .sorted { workouts[$0].date < workouts[$1].date }
+        var consecutiveRuns = 0
+        var lastHistoricalDate: Date?
+
+        for index in historical {
+            let workout = workouts[index]
+            let day = calendar.startOfDay(for: workout.date)
+            let followsPrevious = lastHistoricalDate.flatMap {
+                calendar.date(byAdding: .day, value: 1, to: $0)
+            }.map { calendar.isDate($0, inSameDayAs: day) } ?? false
+            if workout.isCompleted && workout.workoutType.isRunning {
+                consecutiveRuns = followsPrevious ? consecutiveRuns + 1 : 1
+            } else {
+                consecutiveRuns = 0
+            }
+            lastHistoricalDate = day
+        }
+
+        guard consecutiveRuns >= 2,
+              lastHistoricalDate.map({ calendar.isDate($0, inSameDayAs: today) }) == true else {
+            return anchored
+        }
+
+        let future = workouts.indices
+            .filter { calendar.startOfDay(for: workouts[$0].date) > today }
+            .sorted { workouts[$0].date < workouts[$1].date }
+        var runStreak = consecutiveRuns
+
+        for (position, index) in future.enumerated() {
+            let workout = workouts[index]
+            if !workout.workoutType.isRunning {
+                runStreak = 0
+                continue
+            }
+            guard runStreak >= 2,
+                  workout.commitment == nil,
+                  !AcceptedPrescriptionPlanPolicy.isExplicitChoice(workout),
+                  let swapIndex = future.dropFirst(position + 1).first(where: { candidateIndex in
+                      let candidate = workouts[candidateIndex]
+                      return !candidate.workoutType.isRunning
+                          && candidate.workoutType != .rest
+                          && !candidate.isCompleted
+                          && candidate.commitment == nil
+                          && !AcceptedPrescriptionPlanPolicy.isExplicitChoice(candidate)
+                  }) else {
+                runStreak += 1
+                continue
+            }
+
+            let recoveryModality = workouts[swapIndex]
+            workouts[index] = relocated(recoveryModality, to: workout)
+            workouts[swapIndex] = relocated(workout, to: recoveryModality)
+            runStreak = 0
+        }
+
+        return replacingWorkouts(in: anchored, with: workouts, generatedAt: now)
     }
 
     static func containsActivityDate(
@@ -515,9 +601,9 @@ class TrainingPlanService {
 
     private static func anchoringCompletedActivities(
         _ activities: [Activity],
-        to plan: WeeklyTrainingPlan
+        to plan: WeeklyTrainingPlan,
+        calendar: Calendar = .current
     ) -> WeeklyTrainingPlan {
-        let calendar = Calendar.current
         let datedActivities = activities.compactMap { activity -> (Activity, Date)? in
             guard let timestamp = activity.activity_date ?? activity.start_date else { return nil }
             let date = Date(timeIntervalSince1970: timestamp)
@@ -526,28 +612,50 @@ class TrainingPlanService {
         }.sorted { $0.0.id < $1.0.id }
 
         let workouts = plan.workouts.map { workout -> DailyWorkout in
-            guard !workout.isCompleted,
-                  let activity = datedActivities.first(where: {
-                      $0.1 == calendar.startOfDay(for: workout.date)
-                          && activity($0.0, matches: workout.workoutType)
-                  })?.0 else {
+            guard !workout.isCompleted else { return workout }
+            let sameDay = datedActivities.filter {
+                calendar.isDate($0.1, inSameDayAs: workout.date)
+            }.map(\.0)
+            guard let activity = sameDay.first(where: { $0.isCompatible(with: workout.workoutType) })
+                    ?? sameDay.max(by: { ($0.elapsed_time ?? 0) < ($1.elapsed_time ?? 0) }),
+                  let actualType = workoutType(for: activity) else {
                 return workout
             }
             let distance = activity.distance.map { $0 * 0.000621371 } ?? workout.distance
             let duration = activity.elapsed_time.map { Int(($0 / 60).rounded()) }
                 ?? activity.moving_time.map { Int((Double($0) / 60).rounded()) }
                 ?? workout.duration
+            if activity.isCompatible(with: workout.workoutType) {
+                return DailyWorkout(
+                    id: workout.id,
+                    date: workout.date,
+                    dayOfWeek: workout.dayOfWeek,
+                    workoutType: workout.workoutType,
+                    title: workout.title,
+                    description: workout.description,
+                    duration: duration,
+                    distance: distance,
+                    targetPace: workout.targetPace,
+                    exercises: workout.exercises,
+                    isCompleted: true,
+                    completedActivityId: activity.id,
+                    acceptedPrescription: workout.acceptedPrescription,
+                    acceptedCompletion: workout.acceptedCompletion,
+                    commitment: workout.commitment
+                )
+            }
+            let actualTitle = activity.name?.trimmingCharacters(in: .whitespacesAndNewlines)
             return DailyWorkout(
                 id: workout.id,
                 date: workout.date,
                 dayOfWeek: workout.dayOfWeek,
-                workoutType: workout.workoutType,
-                title: workout.title,
-                description: workout.description,
+                workoutType: actualType,
+                title: actualTitle?.isEmpty == false ? actualTitle! : actualType.displayName,
+                description: "Recorded instead of the planned \(workout.title).",
                 duration: duration,
-                distance: distance,
-                targetPace: workout.targetPace,
-                exercises: workout.exercises,
+                distance: actualType.isRunning ? distance : nil,
+                targetPace: nil,
+                exercises: nil,
                 isCompleted: true,
                 completedActivityId: activity.id
             )
@@ -564,6 +672,61 @@ class TrainingPlanService {
             focusArea: plan.focusArea,
             notes: plan.notes,
             generatedAt: plan.generatedAt,
+            goalId: plan.goalId
+        )
+    }
+
+    private static func workoutType(for activity: Activity) -> WorkoutType? {
+        let value = (activity.type ?? activity.name ?? "").lowercased()
+        if value.contains("run") || value.contains("jog") { return .easyRun }
+        if value.contains("ride") || value.contains("cycl") || value.contains("bike") { return .cycling }
+        if value.contains("swim") { return .swimming }
+        if value.contains("walk") { return .walking }
+        if value.contains("hik") { return .hiking }
+        if value.contains("strength") || value.contains("weight") || value.contains("workout") || value.contains("crossfit") {
+            return .strengthTraining
+        }
+        if value.contains("yoga") { return .yoga }
+        if value.contains("mobility") || value.contains("stretch") { return .stretchMobility }
+        return nil
+    }
+
+    private static func relocated(_ source: DailyWorkout, to destination: DailyWorkout) -> DailyWorkout {
+        DailyWorkout(
+            id: source.id,
+            date: destination.date,
+            dayOfWeek: destination.dayOfWeek,
+            workoutType: source.workoutType,
+            title: source.title,
+            description: source.description,
+            duration: source.duration,
+            distance: source.distance,
+            targetPace: source.targetPace,
+            exercises: source.exercises,
+            isCompleted: false,
+            completedActivityId: nil,
+            acceptedPrescription: source.acceptedPrescription,
+            acceptedCompletion: nil,
+            commitment: nil
+        )
+    }
+
+    private static func replacingWorkouts(
+        in plan: WeeklyTrainingPlan,
+        with workouts: [DailyWorkout],
+        generatedAt: Date
+    ) -> WeeklyTrainingPlan {
+        WeeklyTrainingPlan(
+            id: plan.id,
+            athleteId: plan.athleteId,
+            weekStartDate: plan.weekStartDate,
+            weekEndDate: plan.weekEndDate,
+            workouts: workouts.sorted { $0.date < $1.date },
+            weekNumber: plan.weekNumber,
+            totalMileage: workouts.filter { $0.workoutType.isRunning }.compactMap(\.distance).reduce(0, +),
+            focusArea: plan.focusArea,
+            notes: "Plan rebalanced around completed work.",
+            generatedAt: generatedAt,
             goalId: plan.goalId
         )
     }
@@ -1378,7 +1541,7 @@ class TrainingPlanService {
         runningDistance: Double? = nil,
         runningTargetPace: String? = nil
     ) -> DailyWorkout {
-        let description = "Scheduled from your training profile (\(assignment.reason.rawValue))."
+        let description = assignment.reason.coachingDescription
         let exercises = StrengthSessionPrescription.exercises(for: assignment.workoutType, profile: profile)
         return createWorkout(
             date: assignment.date,

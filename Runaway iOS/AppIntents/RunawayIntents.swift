@@ -65,6 +65,66 @@ struct ReevaluateTrainingIntent: AppIntent {
     }
 }
 
+// MARK: - Performance Coach
+
+struct CommitWorkoutIntent: AppIntent {
+    static var title: LocalizedStringResource = "Commit to Today's Workout"
+    static var description = IntentDescription("Commit to the exact workout currently published by Runaway.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        guard let prescription = WidgetPrescriptionSnapshot.cached(in: defaults),
+              let fingerprint = prescription.prescriptionFingerprint else {
+            return .result(dialog: "Open Runaway to review today's current workout.")
+        }
+        if prescription.status == .committed {
+            return .result(dialog: "You're already committed to \(prescription.title).")
+        }
+        PerformanceCoachIntentRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            action: .commitRecommendation,
+            prescriptionFingerprint: fingerprint,
+            createdAt: Date()
+        ).store(in: defaults)
+        return .result(dialog: "Runaway will verify and commit \(prescription.title).")
+    }
+}
+
+struct ReviewWorkoutOptionsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Review Workout Options"
+    static var description = IntentDescription("Review complete alternatives and their effect on your training week.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        PerformanceCoachIntentRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            action: .reviewOptions,
+            prescriptionFingerprint: WidgetPrescriptionSnapshot.cached(in: defaults)?.prescriptionFingerprint,
+            createdAt: Date()
+        ).store(in: defaults)
+        return .result()
+    }
+}
+
+struct ViewCommittedWorkoutIntent: AppIntent {
+    static var title: LocalizedStringResource = "View Committed Workout"
+    static var description = IntentDescription("Open the exact workout you committed to today.")
+    static var openAppWhenRun = true
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: "group.com.jackrudelic.runawayios")
+        PerformanceCoachIntentRequest(
+            athleteID: defaults?.integer(forKey: TrainingProgressSnapshot.athleteKey) ?? 0,
+            action: .viewCommittedWorkout,
+            prescriptionFingerprint: WidgetPrescriptionSnapshot.cached(in: defaults)?.prescriptionFingerprint,
+            createdAt: Date()
+        ).store(in: defaults)
+        return .result()
+    }
+}
+
 // MARK: - Race Countdown
 
 struct CheckRaceCountdownIntent: AppIntent {

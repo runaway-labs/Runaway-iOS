@@ -118,6 +118,8 @@ class DataManager {
         updateWidgetData()
         lastDataRefresh = Date()
         await processPendingCoachEvents(athleteID: userId)
+        await checkAndRegeneratePlanIfNeeded()
+        updateWidgetData()
     }
 
     func loadActivities(for userId: Int) async {
@@ -401,6 +403,7 @@ class DataManager {
                 scope: .remainingCurrentWeek,
                 defaults: .standard
             )
+            updateWidgetData()
 
             #if DEBUG
             print("📋 DataManager: Plan regenerated successfully")
@@ -496,10 +499,116 @@ class DataManager {
         profile: TrainingProfile? = nil,
         acceptedReceipt: AcceptedPrescriptionPlanReceipt? = nil
     ) throws {
+        let previousPlan = currentWeeklyPlan
         let normalizedProfile = resolvedTrainingProfile(profile)
         try TrainingPlanService.cachePlan(plan, profile: normalizedProfile, acceptedReceipt: acceptedReceipt)
         trainingPlanGenerationToken &+= 1
         currentWeeklyPlan = plan
+        updateWidgetData()
+        if Self.committedWorkoutCompleted(from: previousPlan, to: plan) {
+            CelebrationService.shared.celebrate(for: .full)
+        }
+    }
+
+    func commitTodayWorkout(_ preview: TodayWorkoutDecisionPreview) throws {
+        guard let currentWeeklyPlan else { throw TodayWorkoutDecisionError.stalePlan }
+        let committed = try TodayWorkoutDecisionService.commit(
+            preview: preview,
+            currentPlan: currentWeeklyPlan
+        )
+        try updateCurrentWeeklyPlan(committed)
+        try? recordTodayWorkoutDecision(
+            before: currentWeeklyPlan,
+            after: committed,
+            eventID: preview.id,
+            changes: preview.changes
+        )
+        WidgetSyncService.shared.reloadWidgetTimelines()
+        NotificationCenter.default.post(name: .workoutCommitmentDidChange, object: committed)
+    }
+
+    func commitPublishedRecommendation(prescriptionFingerprint: String) throws {
+        guard let currentWeeklyPlan else { throw TodayWorkoutDecisionError.stalePlan }
+        let committed = try TodayWorkoutDecisionService.commitPublishedRecommendation(
+            prescriptionFingerprint: prescriptionFingerprint,
+            currentPlan: currentWeeklyPlan
+        )
+        try updateCurrentWeeklyPlan(committed)
+        let workout = committed.workouts.first(where: { Calendar.current.isDateInToday($0.date) })
+        let change = TodayWorkoutDecisionPreview.Change(
+            id: "shortcut-commit-\(workout?.id ?? "today")",
+            kind: .replaced,
+            title: "Committed to \(workout?.title ?? "today's workout")",
+            detail: "The published prescription was verified before commitment."
+        )
+        try? recordTodayWorkoutDecision(
+            before: currentWeeklyPlan,
+            after: committed,
+            eventID: UUID(),
+            changes: [change]
+        )
+        WidgetSyncService.shared.reloadWidgetTimelines()
+        NotificationCenter.default.post(name: .workoutCommitmentDidChange, object: committed)
+    }
+
+    private func recordTodayWorkoutDecision(
+        before: WeeklyTrainingPlan,
+        after: WeeklyTrainingPlan,
+        eventID: UUID,
+        changes: [TodayWorkoutDecisionPreview.Change]
+    ) throws {
+        let encodedBefore = try JSONEncoder().encode(before)
+        let encodedAfter = try JSONEncoder().encode(after)
+        let afterRevision = try AcceptedPrescriptionPlanPolicy.fingerprint(after)
+        let coachChanges = changes.filter { $0.kind != .protected }.map {
+            CoachChange(
+                kind: $0.kind == .moved ? .moved : .replaced,
+                workoutID: $0.id,
+                before: nil,
+                after: $0.title,
+                weeklyLoadDelta: 0,
+                isKeyWorkout: false
+            )
+        }
+        guard !coachChanges.isEmpty else { return }
+        let decision = CoachDecision(
+            athleteID: after.athleteId,
+            eventIDs: [eventID],
+            beforeRevision: try AcceptedPrescriptionPlanPolicy.fingerprint(before),
+            afterRevision: afterRevision,
+            changes: coachChanges,
+            reasonCodes: [.athleteRequested],
+            classification: .approvalRequired,
+            state: .applied,
+            confidence: 1,
+            missingData: [],
+            policyVersion: "performance-coach-daily-decision-v1",
+            createdAt: Date(),
+            appliedAt: Date(),
+            previousPlanData: encodedBefore,
+            proposedPlanData: encodedAfter,
+            appliedPlanFingerprint: afterRevision
+        )
+        try ProtectedTrainingRepository(activeAthleteID: {
+            UserSession.shared.isReady ? UserSession.shared.userId : nil
+        }).saveCoachDecision(decision, athleteID: after.athleteId)
+    }
+
+    private static func committedWorkoutCompleted(
+        from previousPlan: WeeklyTrainingPlan?,
+        to updatedPlan: WeeklyTrainingPlan
+    ) -> Bool {
+        guard let previousPlan else { return false }
+        return updatedPlan.workouts.contains { updated in
+            guard updated.commitment != nil,
+                  Self.isStoredComplete(updated),
+                  let previous = previousPlan.workouts.first(where: { $0.id == updated.id }) else { return false }
+            return !Self.isStoredComplete(previous)
+        }
+    }
+
+    private static func isStoredComplete(_ workout: DailyWorkout) -> Bool {
+        workout.isCompleted || workout.acceptedCompletion?.isPartial == false
     }
 
     private func resolvedTrainingProfile(
@@ -650,6 +759,10 @@ class DataManager {
     // MARK: - Widget Data Management
 
     func updateWidgetData() {
+        widgetSyncService.updatePrescriptionData(
+            workout: currentWeeklyPlan?.workout(for: Date()),
+            activities: activities
+        )
         // Use database-based stats when athlete ID is available (accurate totals)
         if let athleteId = athlete?.id {
             widgetSyncService.updateWidgetDataFromDatabase(athleteId: athleteId, activities: activities)

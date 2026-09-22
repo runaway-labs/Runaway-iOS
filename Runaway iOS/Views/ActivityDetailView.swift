@@ -95,6 +95,22 @@ struct ActivityDetailView: View {
                         Text(activityType)
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundColor(activityColor)
+
+                        Spacer()
+
+                        Menu {
+                            Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                                Label("Delete Activity", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
+                                .frame(width: 36, height: 36)
+                                .background(AppTheme.Colors.DarkMode.cardBackground)
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Activity options")
                     }
 
                     Text(activity.name ?? "Activity")
@@ -188,15 +204,16 @@ struct ActivityDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(role: .destructive) { showDeleteConfirmation = true } label: {
-                        Label("Delete Activity", systemImage: "trash")
-                    }
+                Button {
+                    dismiss()
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundColor(activityColor)
-                        .font(.title3)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
+                        .frame(width: 38, height: 38)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Close activity")
             }
         }
         .alert("Delete Activity", isPresented: $showDeleteConfirmation) {

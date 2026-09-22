@@ -6,6 +6,21 @@ struct ProtectedCoachEventRecord: Codable, Equatable, Sendable {
     var processedAt: Date?
 }
 
+struct CoachRecommendationJournalEntry: Codable, Identifiable {
+    let id: UUID
+    let athleteID: Int
+    let workout: DailyWorkout
+    let whyToday: String
+    let recommendationOnly: Bool
+    let deliveredAt: Date
+    var openedAt: Date?
+
+    var isValid: Bool {
+        athleteID > 0 && !whyToday.isEmpty && deliveredAt.timeIntervalSince1970.isFinite &&
+            (openedAt?.timeIntervalSince1970.isFinite ?? true)
+    }
+}
+
 struct CoachUndoResult: Sendable {
     let restoredPlan: WeeklyTrainingPlan
     let reversal: CoachDecision
@@ -47,6 +62,24 @@ final class CoachDecisionLedger {
 
     func events() throws -> [CoachEvent] {
         try repository.coachEventRecords(athleteID: athleteID).map(\.event)
+    }
+
+    func recommendations() throws -> [CoachRecommendationJournalEntry] {
+        try repository.coachRecommendationEntries(athleteID: athleteID)
+    }
+
+    func saveRecommendation(_ entry: CoachRecommendationJournalEntry) throws {
+        guard entry.athleteID == athleteID else {
+            throw ProtectedTrainingRepository.RepositoryError.ownershipMismatch
+        }
+        try repository.saveCoachRecommendationEntry(entry, athleteID: athleteID)
+    }
+
+    func markRecommendationOpened(_ id: UUID, at date: Date = Date()) throws {
+        guard var entry = try recommendations().first(where: { $0.id == id }) else { return }
+        guard entry.openedAt == nil else { return }
+        entry.openedAt = date
+        try saveRecommendation(entry)
     }
 
     func pendingEvents() throws -> [CoachEvent] {

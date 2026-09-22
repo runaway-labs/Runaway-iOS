@@ -2,17 +2,20 @@ import Foundation
 
 enum WidgetPrescriptionStatus: String, Codable, Equatable, Sendable {
     case scheduled
+    case committed
     case partial
     case completed
 
-    static func resolve(isCompleted: Bool, isPartial: Bool) -> Self {
+    static func resolve(isCompleted: Bool, isPartial: Bool, isCommitted: Bool = false) -> Self {
         if isPartial { return .partial }
-        return isCompleted ? .completed : .scheduled
+        if isCompleted { return .completed }
+        return isCommitted ? .committed : .scheduled
     }
 
     var label: String {
         switch self {
         case .scheduled: return "Up next"
+        case .committed: return "Committed"
         case .partial: return "Partial"
         case .completed: return "Completed"
         }
@@ -25,10 +28,45 @@ struct WidgetPrescriptionSnapshot: Codable, Equatable, Sendable {
     let title: String
     let detail: String
     let status: WidgetPrescriptionStatus
+    var prescriptionFingerprint: String? = nil
 
     static func cached(in defaults: UserDefaults?) -> Self? {
         guard let data = defaults?.data(forKey: cacheKey) else { return nil }
         return try? JSONDecoder().decode(Self.self, from: data)
+    }
+}
+
+enum PerformanceCoachIntentAction: String, Codable, Sendable {
+    case commitRecommendation
+    case reviewOptions
+    case viewCommittedWorkout
+}
+
+struct PerformanceCoachIntentRequest: Codable, Equatable, Sendable {
+    static let cacheKey = "performance_coach_intent_request_v1"
+    static let maximumAge: TimeInterval = 10 * 60
+
+    let athleteID: Int
+    let action: PerformanceCoachIntentAction
+    let prescriptionFingerprint: String?
+    let createdAt: Date
+
+    var isCurrent: Bool {
+        Date().timeIntervalSince(createdAt) <= Self.maximumAge
+    }
+
+    func store(in defaults: UserDefaults?) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults?.set(data, forKey: Self.cacheKey)
+    }
+
+    static func cached(in defaults: UserDefaults?) -> Self? {
+        guard let data = defaults?.data(forKey: cacheKey) else { return nil }
+        return try? JSONDecoder().decode(Self.self, from: data)
+    }
+
+    static func clear(in defaults: UserDefaults?) {
+        defaults?.removeObject(forKey: cacheKey)
     }
 }
 

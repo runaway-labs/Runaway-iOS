@@ -9,8 +9,8 @@ import Supabase
 
 enum RunawayTab: Int, CaseIterable {
     case today
-    case activities
     case plan
+    case activities
     case you
 
     var title: String {
@@ -70,18 +70,18 @@ struct MainView: View {
                     }
                 }
 
-                Tab(RunawayTab.activities.title, systemImage: RunawayTab.activities.systemImage, value: RunawayTab.activities) {
+                Tab(RunawayTab.plan.title, systemImage: RunawayTab.plan.systemImage, value: RunawayTab.plan) {
                     NavigationStack(path: Bindable(router).path) {
-                        ActivitiesView()
+                        PlanView()
                             .navigationDestination(for: AppRouter.Route.self) { route in
                                 router.destination(for: route)
                             }
                     }
                 }
 
-                Tab(RunawayTab.plan.title, systemImage: RunawayTab.plan.systemImage, value: RunawayTab.plan) {
+                Tab(RunawayTab.activities.title, systemImage: RunawayTab.activities.systemImage, value: RunawayTab.activities) {
                     NavigationStack(path: Bindable(router).path) {
-                        PlanView()
+                        ActivitiesView()
                             .navigationDestination(for: AppRouter.Route.self) { route in
                                 router.destination(for: route)
                             }

@@ -9,6 +9,7 @@ import SwiftUI
 import Charts
 
 enum AthleteAccountAction: Equatable {
+    case integrations
     case systemSettings
     case trainingPreferences
 }
@@ -20,7 +21,9 @@ enum AthleteAccountItem: CaseIterable {
 
     var action: AthleteAccountAction {
         switch self {
-        case .devicesAndSensors, .notifications:
+        case .devicesAndSensors:
+            return .integrations
+        case .notifications:
             return .systemSettings
         case .trainingPreferences:
             return .trainingPreferences
@@ -32,16 +35,15 @@ struct AthleteView: View {
     let athlete: Athlete
     let stats: AthleteStats
     @Environment(DataManager.self) private var dataManager
+    @Environment(AppRouter.self) private var router
     @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
+    @StateObject private var garminService = GarminService.shared
     @State private var personalBests: [SupportedPersonalBest] = []
     @State private var isLoadingPRs = false
     @State private var prLoadError = false
     @State private var selectedRecordActivity: LocalActivity?
     @State private var showingRunningGoals = false
-    @State private var mindsetProfile: MindsetProfile? = nil
     @State private var milestones: [RunnerIdentityMilestone] = []
-    @State private var mindsetLoadError = false
-    @State private var showingEditMindset = false
     @State private var showingTrainingPreferences = false
     @Environment(\.openURL) private var openURL
 
@@ -89,77 +91,6 @@ struct AthleteView: View {
 
                     AthleteAchievementSummary(athleteID: athlete.id)
 
-                    // ── MINDSET ────────────────────────────────────────────
-                    VStack(alignment: .leading, spacing: 10) {
-                        EyebrowLabel(text: "MINDSET")
-                        if mindsetLoadError {
-                            Button {
-                                guard let athleteId = athlete.id else { return }
-                                mindsetLoadError = false
-                                Task {
-                                    async let p = RunnerMindsetService.fetchProfile(athleteId: athleteId)
-                                    async let m = RunnerMindsetService.fetchMilestones(athleteId: athleteId)
-                                    do {
-                                        mindsetProfile = try await p
-                                    } catch {
-                                        mindsetLoadError = true
-                                    }
-                                    milestones = (try? await m) ?? []
-                                }
-                            } label: {
-                                HStack {
-                                    Text("Couldn't load · tap to retry")
-                                        .font(.system(size: 14, design: .rounded))
-                                        .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(AppTheme.Colors.DarkMode.cardBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.07), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        } else if let profile = mindsetProfile {
-                            Button { showingEditMindset = true } label: {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(profile.runnerIdentity)
-                                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                                        .foregroundColor(.white)
-                                    Text(profile.identitySummary)
-                                        .font(.system(size: 13, design: .rounded))
-                                        .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                                        .italic()
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(16)
-                                .background(AppTheme.Colors.warmAmber.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(AppTheme.Colors.warmAmber.opacity(0.20), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Button { showingEditMindset = true } label: {
-                                HStack {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(AppTheme.Colors.warmAmber)
-                                    Text("Set your running mindset")
-                                        .font(.system(size: 14, design: .rounded))
-                                        .foregroundColor(AppTheme.Colors.warmAmber)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .background(AppTheme.Colors.DarkMode.cardBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.07), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
                     // ── MILESTONES ─────────────────────────────────────────
                     if !earnedMilestones.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
@@ -187,11 +118,9 @@ struct AthleteView: View {
                         VStack(spacing: 0) {
                             AccountRow(icon: "target", title: "Running goals", subtitle: "Weekly and monthly distance", action: { showingRunningGoals = true })
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
-                            AccountRow(icon: "figure.run", title: "Running Mindset", subtitle: mindsetProfile?.runnerIdentity ?? "Not set", action: { showingEditMindset = true })
-                            Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
                             AccountRow(icon: "bolt.fill", title: "Strava", subtitle: stravaSubtitle)
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
-                            AccountRow(icon: "applewatch", title: "Devices & sensors", subtitle: "Apple Watch", action: {
+                            AccountRow(icon: "watch.analog", title: "Devices & sensors", subtitle: deviceSubtitle, action: {
                                 performAccountAction(for: .devicesAndSensors)
                             })
                             Divider().background(Color.white.opacity(0.06)).padding(.leading, 64)
@@ -216,37 +145,20 @@ struct AthleteView: View {
         .task(id: athlete.id) {
             personalBests = []
             milestones = []
-            mindsetProfile = nil
-            mindsetLoadError = false
             prLoadError = false
             guard let athleteId = athlete.id else { return }
             async let progress: Void = TrainingProgressStore.shared.refresh(athleteID: athleteId)
             async let records: Void = loadRecords()
-            async let profile = RunnerMindsetService.fetchProfile(athleteId: athleteId)
+            async let garminStatus: Void = garminService.checkConnectionStatus()
             async let earned = RunnerMindsetService.fetchMilestones(athleteId: athleteId)
-            do {
-                let loaded = try await profile
-                if !Task.isCancelled { mindsetProfile = loaded }
-            } catch { if !Task.isCancelled { mindsetLoadError = true } }
             let loaded = (try? await earned) ?? []
             if !Task.isCancelled { milestones = loaded }
-            _ = await (progress, records)
+            _ = await (progress, records, garminStatus)
         }
         .sheet(item: $selectedRecordActivity) { activity in
             NavigationStack { ActivityDetailView(activity: activity) }
         }
         .sheet(isPresented: $showingRunningGoals) { GoalSettingsView() }
-        .sheet(isPresented: $showingEditMindset) {
-            if let athleteId = athlete.id {
-                EditRunnerMindsetView(
-                    athleteId: athleteId,
-                    existing: mindsetProfile,
-                    onSave: { newProfile in
-                        mindsetProfile = newProfile
-                    }
-                )
-            }
-        }
         .sheet(isPresented: $showingTrainingPreferences) {
             TrainingProfileView(route: TrainingProfileRoute(store: trainingProfileStore))
         }
@@ -285,8 +197,17 @@ struct AthleteView: View {
         "\(TrainingPersonalizationPresentation.settingsStatus(for: trainingProfileStore).rawValue) · Weekly mix, schedule & strength"
     }
 
+    private var deviceSubtitle: String {
+        DeviceIdentityPresentation.subtitle(
+            activities: dataManager.activities,
+            garminConnected: garminService.isConnected
+        )
+    }
+
     private func performAccountAction(for item: AthleteAccountItem) {
         switch item.action {
+        case .integrations:
+            router.navigate(to: .settings)
         case .systemSettings:
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             openURL(url)
@@ -320,6 +241,35 @@ struct AthleteView: View {
             return "Synced · \(days)d ago"
         }
         return "Connected"
+    }
+}
+
+struct DeviceIdentityPresentation {
+    private static let softwareOnlyNames = Set([
+        "strava app",
+        "runaway ios",
+        "nike"
+    ])
+
+    static func subtitle(activities: [Activity], garminConnected: Bool) -> String {
+        let newestPhysicalDevice = activities
+            .compactMap { activity -> (name: String, date: TimeInterval)? in
+                guard let rawName = activity.device_name?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !rawName.isEmpty,
+                      !softwareOnlyNames.contains(rawName.lowercased()) else {
+                    return nil
+                }
+                return (rawName, activity.activity_date ?? activity.start_date ?? 0)
+            }
+            .max { $0.date < $1.date }
+
+        if let newestPhysicalDevice {
+            return newestPhysicalDevice.name
+        }
+        if garminConnected {
+            return "Garmin Connect"
+        }
+        return "No device detected"
     }
 }
 

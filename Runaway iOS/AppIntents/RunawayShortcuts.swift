@@ -34,6 +34,36 @@ struct RunawayShortcuts: AppShortcutsProvider {
         )
 
         AppShortcut(
+            intent: CommitWorkoutIntent(),
+            phrases: [
+                "Commit to my workout with \(.applicationName)",
+                "I'm in for today's workout with \(.applicationName)"
+            ],
+            shortTitle: "Commit Workout",
+            systemImageName: "checkmark.seal.fill"
+        )
+
+        AppShortcut(
+            intent: ReviewWorkoutOptionsIntent(),
+            phrases: [
+                "Review my workout options with \(.applicationName)",
+                "Change today's workout with \(.applicationName)"
+            ],
+            shortTitle: "Workout Options",
+            systemImageName: "slider.horizontal.3"
+        )
+
+        AppShortcut(
+            intent: ViewCommittedWorkoutIntent(),
+            phrases: [
+                "Show my committed workout in \(.applicationName)",
+                "What did I commit to in \(.applicationName)"
+            ],
+            shortTitle: "Committed Workout",
+            systemImageName: "figure.run.circle.fill"
+        )
+
+        AppShortcut(
             intent: CheckRaceCountdownIntent(),
             phrases: [
                 "How many days until my race with \(.applicationName)",

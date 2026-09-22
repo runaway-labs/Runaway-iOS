@@ -75,6 +75,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                         if let workout = DataManager.shared.currentWeeklyPlan?.workout(
                             for: DayOfWeek.from(date: Date())
                         ), !workout.isCompleted {
+                            let repository = ProtectedTrainingRepository(activeAthleteID: { UserSession.shared.userId })
+                            let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+                            try ledger.saveRecommendation(CoachRecommendationJournalEntry(
+                                id: event.id,
+                                athleteID: athleteID,
+                                workout: workout,
+                                whyToday: workout.displayDescription,
+                                recommendationOnly: false,
+                                deliveredAt: event.receivedAt,
+                                openedAt: nil
+                            ))
                             try await PushNotificationService.shared.presentScheduledCoachRecommendation(
                                 for: workout,
                                 eventID: event.id
@@ -100,6 +111,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
         Task { @MainActor in
+            if let rawID = userInfo["coach_event_id"] as? String,
+               let eventID = UUID(uuidString: rawID),
+               let athleteID = UserSession.shared.userId {
+                let repository = ProtectedTrainingRepository(activeAthleteID: { UserSession.shared.userId })
+                let ledger = CoachDecisionLedger(repository: repository, athleteID: athleteID)
+                try? ledger.markRecommendationOpened(eventID)
+            }
             if response.actionIdentifier != UNNotificationDefaultActionIdentifier,
                response.actionIdentifier != UNNotificationDismissActionIdentifier {
                 PushNotificationService.shared.enqueueCoachAction(userInfo, actionIdentifier: response.actionIdentifier)

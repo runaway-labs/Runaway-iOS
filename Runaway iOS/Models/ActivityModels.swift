@@ -67,6 +67,8 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
     public let competition: Bool?
     public let filename: String?
     public let gear_id: Int?
+    public let device_name: String?
+    public let source: String?
     
     enum CodingKeys: String, CodingKey {
         case id, name, type, distance, elapsed_time
@@ -80,6 +82,7 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
         case humidity, wind_speed, map_polyline, map_summary_polyline
         case start_latitude, start_longitude, end_latitude, end_longitude
         case commute, flagged, with_pet, competition, filename, gear_id
+        case device_name, source
         case activity_types
     }
     
@@ -174,6 +177,8 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
         competition = try container.decodeIfPresent(Bool.self, forKey: .competition)
         filename = try container.decodeIfPresent(String.self, forKey: .filename)
         gear_id = try container.decodeIfPresent(Int.self, forKey: .gear_id)
+        device_name = try container.decodeIfPresent(String.self, forKey: .device_name)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -229,6 +234,8 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
         try container.encodeIfPresent(competition, forKey: .competition)
         try container.encodeIfPresent(filename, forKey: .filename)
         try container.encodeIfPresent(gear_id, forKey: .gear_id)
+        try container.encodeIfPresent(device_name, forKey: .device_name)
+        try container.encodeIfPresent(source, forKey: .source)
     }
 
     public init(
@@ -274,7 +281,9 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
         with_pet: Bool? = nil,
         competition: Bool? = nil,
         filename: String? = nil,
-        gear_id: Int? = nil
+        gear_id: Int? = nil,
+        device_name: String? = nil,
+        source: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -319,6 +328,8 @@ public struct Activity: Identifiable, Codable, Equatable, Sendable {
         self.competition = competition
         self.filename = filename
         self.gear_id = gear_id
+        self.device_name = device_name
+        self.source = source
     }
 }
 
@@ -494,4 +505,3 @@ extension Date {
         return ISO8601DateFormatter().string(from: self)
     }
 }
-

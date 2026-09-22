@@ -153,3 +153,23 @@ private struct GarminDisconnectUpdate: Encodable {
     let garmin_token_secret: String?
     let garmin_connected_at: String?
 }
+
+private struct GarminHealthRefreshRequest: Encodable {}
+
+private struct GarminHealthRefreshResponse: Decodable {
+    let success: Bool
+}
+
+extension GarminService {
+    func refreshHealthHistory() async {
+        do {
+            let _: GarminHealthRefreshResponse = try await edgeClient.invoke(
+                "garmin-stats",
+                body: GarminHealthRefreshRequest()
+            )
+        } catch {
+            // Refresh is opportunistic. Existing HealthKit and cached Garmin data remain available.
+            print("Garmin health refresh deferred: \(error.localizedDescription)")
+        }
+    }
+}

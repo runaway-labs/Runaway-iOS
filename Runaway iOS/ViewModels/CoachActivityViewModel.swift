@@ -14,6 +14,7 @@ final class CoachActivityViewModel {
 
     private(set) var pending: [CoachDecision] = []
     private(set) var history: [CoachDecision] = []
+    private(set) var recommendations: [CoachRecommendationJournalEntry] = []
     private(set) var errorMessage: String?
 
     init(ledger: CoachDecisionLedger, currentPlan: @escaping () -> WeeklyTrainingPlan?,
@@ -27,6 +28,14 @@ final class CoachActivityViewModel {
         let owned = try ledger.decisions().filter { $0.athleteID == athleteID }
         pending = owned.filter { $0.state == .proposed }.sorted { $0.createdAt > $1.createdAt }
         history = owned.filter { $0.state != .proposed }.sorted { $0.createdAt > $1.createdAt }
+        recommendations = try ledger.recommendations()
+            .filter { $0.athleteID == athleteID }
+            .sorted { $0.deliveredAt > $1.deliveredAt }
+    }
+
+    func openRecommendation(_ id: UUID, athleteID: Int) throws {
+        try ledger.markRecommendationOpened(id)
+        try load(athleteID: athleteID)
     }
 
     func availableActions(for decision: CoachDecision) -> [CoachDecisionAction] {

@@ -1071,7 +1071,6 @@ struct TrainingProfileIntegrationTests {
         let legacyLaterSteps: [OnboardingStep] = [
             .experienceAssessment,
             .movementTest,
-            .runnerMindset,
             .locationPermission,
             .coachSelection,
             .completion,

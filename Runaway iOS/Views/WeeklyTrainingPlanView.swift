@@ -375,7 +375,7 @@ struct WorkoutDetailSheet: View {
                         Label("Recommendation, not yet scheduled", systemImage: "info.circle")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Text("Use Adjust today on the Today screen to choose this session and update your week. No distance or duration is assigned until you make that choice.")
+                        Text("Use Performance Coach on Today to choose this session, review its exact dose and see how the week adapts before committing.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

@@ -2,27 +2,28 @@
 //  PlanView.swift
 //  Runaway iOS
 //
-//  Race-first plan view.
-//  Upcoming: next race header + training plan
-//  Past: completed/expired races
+//  Weekly schedule and race planning.
 //
 
 import SwiftUI
 
-// MARK: - Race Section Enum
+// MARK: - Plan Section Enum
 
-enum RaceSection: String, CaseIterable {
-    case upcoming = "Upcoming"
-    case past     = "Past"
+enum PlanSection: String, CaseIterable {
+    case weeklySchedule = "Weekly Schedule"
+    case races = "Races"
 }
 
 struct PlanView: View {
     @Environment(DataManager.self) var dataManager
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
     @StateObject private var viewModel = PlanViewModel()
     @ObservedObject private var unitPreferences = UnitPreferences.shared
-    @State private var selectedSection: RaceSection = .upcoming
+    @State private var selectedSection: PlanSection = .weeklySchedule
     @State private var showingWorkoutDetail: DailyWorkout?
+    @State private var decisionWorkout: DailyWorkout?
+    @State private var decisionStartsWithChoices = false
     @State private var showingTrainingGuidelines = false
     @State private var showingGoalSettings = false
     @State private var showingManualRace = false
@@ -45,15 +46,10 @@ struct PlanView: View {
         allGoals.filter { !$0.isUpcoming }.reversed()
     }
 
-    private var nextRace: AthleteRace? {
-        upcomingRaces.first
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            // Upcoming / Past toggle
             Picker("Section", selection: $selectedSection) {
-                ForEach(RaceSection.allCases, id: \.self) { s in
+                ForEach(PlanSection.allCases, id: \.self) { s in
                     Text(s.rawValue).tag(s)
                 }
             }
@@ -62,8 +58,8 @@ struct PlanView: View {
             .padding(.vertical, AppTheme.Spacing.sm)
 
             switch selectedSection {
-            case .upcoming: upcomingContent
-            case .past:     pastContent
+            case .weeklySchedule: weeklyScheduleContent
+            case .races: racesContent
             }
         }
         .background {
@@ -86,6 +82,16 @@ struct PlanView: View {
             }
         }
         .sheet(item: $showingWorkoutDetail) { PlanWorkoutDetailSheet(workout: $0) }
+        .sheet(item: $decisionWorkout) { workout in
+            if let plan = dataManager.currentWeeklyPlan {
+                TodayWorkoutDecisionSheet(
+                    plan: plan,
+                    profile: trainingProfileStore.profile,
+                    recommendedWorkout: workout,
+                    startChoosing: decisionStartsWithChoices
+                )
+            }
+        }
         .sheet(isPresented: $showingTrainingGuidelines) { TrainingGuidelinesSheet() }
         .sheet(isPresented: $showingGoalSettings, onDismiss: {
             Task { await loadAll() }
@@ -144,25 +150,30 @@ struct PlanView: View {
         }
     }
 
-    // MARK: - Upcoming Content
+    private func handleWeekBoardAction(_ action: CoachWeekBoard.UserAction) {
+        func workout(_ id: String) -> DailyWorkout? {
+            dataManager.currentWeeklyPlan?.workouts.first { $0.id == id }
+        }
+        switch action {
+        case .commit(let id):
+            decisionStartsWithChoices = false
+            decisionWorkout = workout(id)
+        case .change(let id):
+            decisionStartsWithChoices = true
+            decisionWorkout = workout(id)
+        case .viewWorkout(let id), .reviewResult(let id):
+            showingWorkoutDetail = workout(id)
+        case .reviewCoachDecision(let id):
+            router.navigate(to: .coachDecision(id))
+        }
+    }
+
+    // MARK: - Weekly Schedule
 
     @ViewBuilder
-    private var upcomingContent: some View {
+    private var weeklyScheduleContent: some View {
         ScrollView {
             VStack(spacing: AppTheme.Spacing.lg) {
-                // ── Upcoming Races Carousel ────────────────
-                if upcomingRaces.isEmpty {
-                    NoRaceCard { showingManualRace = true }
-                } else {
-                    RaceCarousel(
-                        races: upcomingRaces,
-                        onEdit: { editingManualRace = $0 }
-                    )
-                }
-
-                // ── Training Plan ──────────────────────────
-                sectionHeader("TRAINING PLAN")
-
                 if let coachDecision {
                     CoachChangeBanner(decision: coachDecision) {
                         router.navigate(to: .coachDecision(coachDecision.id))
@@ -172,27 +183,23 @@ struct PlanView: View {
                 if viewModel.isLoading && viewModel.displayedPlan == nil {
                     LoadingPlanView()
                 } else if let plan = viewModel.displayedPlan {
-                    PlanHeaderCard(
-                        plan: plan,
-                        insights: viewModel.adaptiveInsights,
+                    CoachWeekBoard(
+                        presentation: CoachWeekBoardPresentation.make(
+                            plan: plan,
+                            activities: dataManager.activities,
+                            recentDecision: coachDecision,
+                            distanceFormatter: { UnitFormatter.formatMiles($0) }
+                        ),
+                        focusTitle: plan.focusArea,
+                        focusDescription: plan.focusArea.map(focusExplanation),
+                        isRegenerating: viewModel.isGenerating,
                         onRegenerate: { Task { await viewModel.regeneratePlan() } },
-                        isRegenerating: viewModel.isGenerating
+                        onAction: handleWeekBoardAction
                     )
 
                     if let baseline = viewModel.trainingBaseline {
                         BaselineTransparencyCard(baseline: baseline)
                     }
-
-                    if let todayWorkout = viewModel.todaysWorkout,
-                       todayWorkout.workoutType != .rest {
-                        TodayWorkoutCard(
-                            workout: todayWorkout,
-                            actualActivity: viewModel.todaysActivity,
-                            onTap: { showingWorkoutDetail = todayWorkout }
-                        )
-                    }
-
-                    TrainingWeekTimeline(plan: plan, onSelect: { showingWorkoutDetail = $0 })
 
                     if let insights = viewModel.adaptiveInsights {
                         AdaptiveInsightsCard(insights: insights)
@@ -213,34 +220,85 @@ struct PlanView: View {
         .refreshable { await loadAll() }
     }
 
-    // MARK: - Past Content
+    private func focusExplanation(_ focus: String) -> String {
+        let normalized = focus.lowercased()
+        if normalized.contains("base") {
+            return "Build durable weekly volume and consistency before race-specific work."
+        }
+        if normalized.contains("build") {
+            return "Increase useful training load while protecting recovery between hard days."
+        }
+        if normalized.contains("peak") {
+            return "Sharpen race-specific fitness while holding onto the strength already built."
+        }
+        if normalized.contains("taper") {
+            return "Reduce fatigue while preserving speed and readiness for race day."
+        }
+        if normalized.contains("recover") {
+            return "Absorb recent work with lower stress before the next progression."
+        }
+        return "This is the coach's main priority when balancing the sessions below."
+    }
+
+    // MARK: - Races
 
     @ViewBuilder
-    private var pastContent: some View {
-        if isLoadingGoals {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if pastRaces.isEmpty {
-            VStack(spacing: 16) {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 48))
-                    .foregroundColor(AppTheme.Colors.accent.opacity(0.5))
-                Text("No past races yet")
-                    .font(AppTheme.Typography.headline)
-                    .foregroundColor(sec)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.top, 80)
-        } else {
-            ScrollView {
-                VStack(spacing: AppTheme.Spacing.md) {
+    private var racesContent: some View {
+        ScrollView {
+            VStack(spacing: AppTheme.Spacing.lg) {
+                sectionHeader("UPCOMING RACES")
+
+                if isLoadingGoals && allGoals.isEmpty {
+                    ProgressView()
+                        .tint(AppTheme.Colors.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, AppTheme.Spacing.xxl)
+                } else if upcomingRaces.isEmpty {
+                    NoRaceCard { showingManualRace = true }
+                } else {
+                    RaceCarousel(
+                        races: upcomingRaces,
+                        onEdit: { editingManualRace = $0 }
+                    )
+
+                    Button { showingManualRace = true } label: {
+                        Label("Add another race", systemImage: "plus.circle.fill")
+                            .font(AppTheme.Typography.subheadline)
+                            .foregroundColor(AppTheme.Colors.accent)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, AppTheme.Spacing.sm)
+                    }
+                }
+
+                sectionHeader("PAST RACES")
+
+                if pastRaces.isEmpty {
+                    VStack(spacing: AppTheme.Spacing.sm) {
+                        Image(systemName: "flag.checkered")
+                            .font(.system(size: 28))
+                            .foregroundColor(sec.opacity(0.7))
+                        Text("Completed races will collect here.")
+                            .font(AppTheme.Typography.body)
+                            .foregroundColor(sec)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, AppTheme.Spacing.xl)
+                } else {
                     ForEach(pastRaces) { race in
                         PastRaceRow(race: race)
                     }
                 }
-                .padding()
+
+                if let lastRefreshError {
+                    Text(lastRefreshError)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundColor(.red.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            .padding()
         }
+        .refreshable { await loadAll() }
     }
 
     private func sectionHeader(_ text: String) -> some View {
@@ -633,72 +691,6 @@ struct PlanStatItem: View {
     }
 }
 
-// MARK: - Today\'s Workout Card
-
-struct TodayWorkoutCard: View {
-    let workout: DailyWorkout
-    let actualActivity: Activity?
-    let onTap: () -> Void
-
-    var isCompleted: Bool {
-        if let completion = workout.acceptedCompletion { return !completion.isPartial }
-        return actualActivity != nil || workout.isCompleted
-    }
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
-                HStack {
-                    Label("Today", systemImage: "calendar")
-                        .font(AppTheme.Typography.caption)
-                        .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                    Spacer()
-                    if workout.acceptedCompletion?.isPartial == true {
-                        Label("Partial session", systemImage: "circle.lefthalf.filled")
-                            .font(AppTheme.Typography.caption).foregroundColor(.orange)
-                    } else if isCompleted {
-                        Label("Completed", systemImage: "checkmark.circle.fill")
-                            .font(AppTheme.Typography.caption)
-                            .foregroundColor(.green)
-                    }
-                }
-                HStack(spacing: AppTheme.Spacing.md) {
-                    Image(systemName: workout.workoutType.icon)
-                        .font(.system(size: 28))
-                        .foregroundColor(workout.workoutType.color)
-                        .frame(width: 50, height: 50)
-                        .background(workout.workoutType.color.opacity(0.1))
-                        .cornerRadius(12)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(workout.title)
-                            .font(AppTheme.Typography.headline)
-                            .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
-                        HStack(spacing: AppTheme.Spacing.sm) {
-                            if let d = workout.formattedDistance {
-                                Text(d).font(AppTheme.Typography.body)
-                                    .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                            }
-                            if let p = workout.displayTargetPace {
-                                Text("@ \(p)").font(AppTheme.Typography.body)
-                                    .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
-                            }
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(AppTheme.Colors.DarkMode.textTertiary)
-                }
-            }
-            .padding()
-            .background(AppTheme.Colors.DarkMode.cardBackground)
-            .cornerRadius(AppTheme.CornerRadius.large)
-            .overlay(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large).stroke(Color.white.opacity(0.07), lineWidth: 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
 // MARK: - Week Overview Section
 
 struct WeekOverviewSection: View {
@@ -828,15 +820,15 @@ struct BaselineTransparencyCard: View {
             }
             .buttonStyle(PlainButtonStyle())
 
-            HStack(spacing: AppTheme.Spacing.lg) {
-                BaselineStatPill(label: "Prior 4 Weeks",
-                                 value: "\(UnitFormatter.formatMiles(baseline.averageWeeklyMileage))/wk",
-                                 icon: "calendar")
-                BaselineStatPill(label: "Runs/Week", value: "\(baseline.runsPerWeek)", icon: "figure.run")
-                BaselineStatPill(label: "Easy Pace", value: formatPace(baseline.averageEasyPace), icon: "speedometer")
-            }
-
             if isExpanded {
+                HStack(spacing: AppTheme.Spacing.lg) {
+                    BaselineStatPill(label: "Prior 4 Weeks",
+                                     value: "\(UnitFormatter.formatMiles(baseline.averageWeeklyMileage))/wk",
+                                     icon: "calendar")
+                    BaselineStatPill(label: "Runs/Week", value: "\(baseline.runsPerWeek)", icon: "figure.run")
+                    BaselineStatPill(label: "Easy Pace", value: formatPace(baseline.averageEasyPace), icon: "speedometer")
+                }
+
                 Divider()
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
                     Text("How the algorithm uses this:")

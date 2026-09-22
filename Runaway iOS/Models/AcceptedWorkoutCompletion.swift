@@ -31,6 +31,7 @@ enum AcceptedWorkoutCompletionProjection {
                 exercises: workout.exercises, isCompleted: !result.isPartial, completedActivityId: workout.completedActivityId)
             updated.acceptedPrescription = workout.acceptedPrescription
             updated.acceptedCompletion = completion
+            updated.commitment = workout.commitment
             changed = true
             return updated
         }

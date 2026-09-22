@@ -13,6 +13,70 @@ enum RemainingWeekTrainingPolicy {
         var id: Date { date }
     }
 
+    struct RebalancedResult {
+        let workouts: [DailyWorkout]
+        let changes: [TodayWorkoutDecisionPreview.Change]
+        let warnings: [TodayWorkoutDecisionPreview.Warning]
+    }
+
+    static func rebalancedPlan(
+        replacingTodayWith replacement: DailyWorkout,
+        in plan: WeeklyTrainingPlan,
+        on date: Date,
+        calendar: Calendar = .current
+    ) -> RebalancedResult {
+        let today = calendar.startOfDay(for: date)
+        guard let originalIndex = plan.workouts.firstIndex(where: {
+            calendar.isDate($0.date, inSameDayAs: today)
+        }) else {
+            return RebalancedResult(workouts: plan.workouts, changes: [], warnings: [])
+        }
+        let original = plan.workouts[originalIndex]
+        var workouts = plan.workouts
+        var changes: [TodayWorkoutDecisionPreview.Change] = []
+        var warnings: [TodayWorkoutDecisionPreview.Warning] = []
+
+        let displacesGoalCriticalRun = original.workoutType == .longRun
+            || original.workoutType == .tempoRun
+            || original.workoutType == .intervalRun
+            || original.workoutType == .hillRun
+        if displacesGoalCriticalRun && replacement.workoutType != original.workoutType,
+           let destination = workouts.indices.first(where: { index in
+               let candidate = workouts[index]
+               return candidate.date > today && !candidate.isCompleted
+                   && candidate.commitment == nil && candidate.workoutType == .rest
+           }) {
+            let target = workouts[destination]
+            workouts[destination] = movedCopy(original, to: target.date, dayOfWeek: target.dayOfWeek)
+            changes.append(.init(
+                id: "move-\(original.id)", kind: .moved,
+                title: "\(original.title) moves to \(target.dayOfWeek.fullName)",
+                detail: "Goal-critical work stays in the week instead of disappearing."
+            ))
+            warnings.append(.goalCriticalWorkoutMoved)
+        }
+
+        workouts[originalIndex] = replacement
+        return RebalancedResult(
+            workouts: workouts.sorted { $0.date < $1.date },
+            changes: changes,
+            warnings: warnings
+        )
+    }
+
+    private static func movedCopy(_ workout: DailyWorkout, to date: Date, dayOfWeek: DayOfWeek) -> DailyWorkout {
+        DailyWorkout(
+            id: "\(workout.id)-moved-\(Int(date.timeIntervalSince1970))",
+            date: date, dayOfWeek: dayOfWeek, workoutType: workout.workoutType,
+            title: workout.title, description: workout.description,
+            duration: workout.duration, distance: workout.distance,
+            targetPace: workout.displayTargetPace, exercises: workout.exercises,
+            isCompleted: false, completedActivityId: nil,
+            acceptedPrescription: workout.acceptedPrescription,
+            acceptedCompletion: nil, commitment: nil
+        )
+    }
+
     static func review(workouts: [DailyWorkout], results: [TrainingSessionResult],
                        availability: [TrainingDayAvailability], on date: Date,
                        calendar: Calendar = .current) -> [DayReview] {
@@ -102,7 +166,8 @@ enum RemainingWeekTrainingPolicy {
                 exercises: workout.exercises, isCompleted: workout.isCompleted,
                 completedActivityId: workout.completedActivityId,
                 acceptedPrescription: workout.acceptedPrescription,
-                acceptedCompletion: workout.acceptedCompletion
+                acceptedCompletion: workout.acceptedCompletion,
+                commitment: workout.commitment
             )
         }
         return AcceptedPrescriptionPlanPolicy.replacingWorkouts(

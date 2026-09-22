@@ -93,6 +93,7 @@ struct DailyWorkout: Codable, Identifiable {
     let completedActivityId: Int?
     var acceptedPrescription: AcceptedTrainingPrescription? = nil
     var acceptedCompletion: AcceptedWorkoutCompletion? = nil
+    var commitment: WorkoutCommitment? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -109,6 +110,7 @@ struct DailyWorkout: Codable, Identifiable {
         case completedActivityId = "completed_activity_id"
         case acceptedPrescription = "accepted_prescription"
         case acceptedCompletion = "accepted_completion"
+        case commitment
     }
 
     var formattedDistance: String? {

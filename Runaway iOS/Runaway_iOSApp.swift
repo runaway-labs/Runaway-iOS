@@ -19,6 +19,7 @@ struct Runaway_iOSApp: App {
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var syncEngine = SyncEngine.shared
     @StateObject private var trainingProfileStore = TrainingProfileStore.shared
+    @StateObject private var celebrationService = CelebrationService.shared
     @State private var router = AppRouter()
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
@@ -79,6 +80,11 @@ struct Runaway_iOSApp: App {
                 .environmentObject(trainingProfileStore)
                 .environment(router)
                 .modelContainer(PersistenceController.shared.container)
+                .celebrationOverlay(
+                    isPresented: $celebrationService.isShowingCelebration,
+                    intensity: celebrationService.currentIntensity,
+                    message: "Workout complete. You moved the plan forward."
+                )
                 .onChange(of: themeManager.currentTheme) { _, newTheme in
                     Self.configureAppearance(isDark: newTheme == .dark)
                 }
@@ -92,6 +98,9 @@ struct Runaway_iOSApp: App {
                         newReady: newReady
                     ) {
                         requestPendingWidgetCommitmentDrain()
+                    }
+                    if newReady {
+                        Task { await GarminService.shared.refreshHealthHistory() }
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -170,6 +179,9 @@ struct Runaway_iOSApp: App {
 
     private func handleAppBecameActive() {
         Task { await CommitmentManager.shared.refresh() }
+        if userSession.isReady {
+            Task { await GarminService.shared.refreshHealthHistory() }
+        }
         requestPendingWidgetCommitmentDrain()
         realtimeService.startRealtimeSubscription()
         realtimeService.resumeFromBackground()
@@ -179,8 +191,10 @@ struct Runaway_iOSApp: App {
         AnalyticsService.shared.resumeFromBackground()
 
         if HealthKitManager.shared.isHealthKitAvailable {
-            Task { await HealthKitManager.shared.requestAuthorization() }
-            Task { await BiometricService.shared.syncHealthData() }
+            Task {
+                _ = await HealthKitManager.shared.requestAuthorization()
+                await BiometricService.shared.syncHealthData()
+            }
         }
 
         Task {
@@ -206,6 +220,38 @@ struct Runaway_iOSApp: App {
     private func requestPendingWidgetCommitmentDrain() {
         WidgetPendingActionDrainCoordinator.shared.requestDrain {
             await applyPendingWidgetCommitment()
+            applyPendingPerformanceCoachIntent()
+        }
+    }
+
+    @MainActor
+    private func applyPendingPerformanceCoachIntent() {
+        guard userSession.isReady,
+              let athleteID = userSession.userId,
+              let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier),
+              let request = PerformanceCoachIntentRequest.cached(in: defaults) else { return }
+        guard request.isCurrent, request.athleteID == athleteID else {
+            PerformanceCoachIntentRequest.clear(in: defaults)
+            return
+        }
+
+        switch request.action {
+        case .commitRecommendation:
+            guard let fingerprint = request.prescriptionFingerprint else {
+                PerformanceCoachIntentRequest.clear(in: defaults)
+                router.navigate(to: .commitmentSetup)
+                return
+            }
+            do {
+                try dataManager.commitPublishedRecommendation(prescriptionFingerprint: fingerprint)
+                PerformanceCoachIntentRequest.clear(in: defaults)
+            } catch {
+                PerformanceCoachIntentRequest.clear(in: defaults)
+                router.navigate(to: .commitmentSetup)
+            }
+        case .reviewOptions, .viewCommittedWorkout:
+            PerformanceCoachIntentRequest.clear(in: defaults)
+            router.navigate(to: .commitmentSetup)
         }
     }
 

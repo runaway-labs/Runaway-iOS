@@ -60,6 +60,7 @@ final class WidgetSyncService {
     func updateBecomingData(
         snapshot: BecomingSnapshot,
         workout: DailyWorkout?,
+        activities: [Activity],
         readinessScore: Int?,
         weatherTitle: String?,
         weatherDetail: String?
@@ -69,24 +70,11 @@ final class WidgetSyncService {
         defaults.set(snapshot.detail, forKey: "becoming_detail")
         defaults.set(workout?.title ?? "Today's training", forKey: "becoming_workout")
         let pace = workout?.workoutType.isRunning == true ? workout?.targetPace : nil
-        let dose = [workout?.formattedDuration, workout?.formattedDistance, pace]
+        let exerciseDose = workout?.exercises.flatMap { $0.isEmpty ? nil : "\($0.count) exercises" }
+        let dose = [workout?.formattedDuration, workout?.formattedDistance, exerciseDose, pace]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         defaults.set(dose.isEmpty ? "Ready when you are" : dose, forKey: "becoming_workout_detail")
-        if let workout {
-            let prescription = WidgetPrescriptionSnapshot(
-                title: workout.title,
-                detail: dose.isEmpty ? workout.workoutType.displayName : dose,
-                status: .resolve(
-                    isCompleted: workout.isCompleted,
-                    isPartial: workout.acceptedCompletion?.isPartial == true
-                )
-            )
-            if let data = try? JSONEncoder().encode(prescription) {
-                defaults.set(data, forKey: WidgetPrescriptionSnapshot.cacheKey)
-            }
-        } else {
-            defaults.removeObject(forKey: WidgetPrescriptionSnapshot.cacheKey)
-        }
+        Self.storePrescription(workout: workout, activities: activities, detail: dose, in: defaults)
         defaults.set(String(describing: snapshot.recommendedChoice), forKey: "becoming_recommended_choice")
         defaults.set(UnitPreferences.shared.distanceUnit.rawValue, forKey: "preferred_activity_distance_unit")
         defaults.set(Date().timeIntervalSince1970, forKey: "becoming_updated_at")
@@ -104,6 +92,46 @@ final class WidgetSyncService {
         }
         WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "CommitmentWidget")
+    }
+
+    func updatePrescriptionData(workout: DailyWorkout?, activities: [Activity]) {
+        guard let defaults = UserDefaults(suiteName: AppConstants.AppGroup.identifier) else { return }
+        let pace = workout?.workoutType.isRunning == true ? workout?.targetPace : nil
+        let exerciseDose = workout?.exercises.flatMap { $0.isEmpty ? nil : "\($0.count) exercises" }
+        let detail = [workout?.formattedDuration, workout?.formattedDistance, exerciseDose, pace]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        Self.storePrescription(workout: workout, activities: activities, detail: detail, in: defaults)
+        WidgetCenter.shared.reloadTimelines(ofKind: "RunawayWidget")
+    }
+
+    private static func storePrescription(
+        workout: DailyWorkout?,
+        activities: [Activity],
+        detail: String,
+        in defaults: UserDefaults
+    ) {
+        guard let workout else {
+            defaults.removeObject(forKey: WidgetPrescriptionSnapshot.cacheKey)
+            return
+        }
+        let completion = CommittedWorkoutCompletionPolicy.status(
+            workout: workout,
+            evidence: activities
+        )
+        let prescription = WidgetPrescriptionSnapshot(
+            title: workout.title,
+            detail: detail.isEmpty ? workout.workoutType.displayName : detail,
+            status: .resolve(
+                isCompleted: workout.isCompleted || completion == .complete,
+                isPartial: workout.acceptedCompletion?.isPartial == true || completion == .partial,
+                isCommitted: workout.commitment != nil
+            ),
+            prescriptionFingerprint: workout.commitment?.prescriptionFingerprint
+                ?? (try? WorkoutPrescriptionFingerprint.make(workout))
+        )
+        if let data = try? JSONEncoder().encode(prescription) {
+            defaults.set(data, forKey: WidgetPrescriptionSnapshot.cacheKey)
+        }
     }
 
     /// Update training phase and race goal for widgets

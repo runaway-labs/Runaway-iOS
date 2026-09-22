@@ -88,7 +88,7 @@ extension AppRouter {
             AccountInformationView()
 
         case .commitmentSetup:
-            FullCommitmentSheet()
+            PerformanceCoachDecisionRouteView()
 
         case .goalManagement:
             GoalSettingsView()
@@ -99,6 +99,30 @@ extension AppRouter {
             CoachActivityRouteView()
         case .coachDecision(let id):
             CoachDecisionRouteView(decisionID: id)
+        }
+    }
+}
+
+private struct PerformanceCoachDecisionRouteView: View {
+    @Environment(DataManager.self) private var dataManager
+    @EnvironmentObject private var trainingProfileStore: TrainingProfileStore
+
+    var body: some View {
+        if let plan = dataManager.currentWeeklyPlan,
+           let workout = plan.workouts.first(where: { Calendar.current.isDateInToday($0.date) }) {
+            TodayWorkoutDecisionSheet(
+                plan: plan,
+                profile: trainingProfileStore.profile,
+                recommendedWorkout: workout,
+                startChoosing: true
+            )
+        } else {
+            ContentUnavailableView(
+                "No workout to review",
+                systemImage: "figure.run.circle",
+                description: Text("Open Today after your training plan is ready.")
+            )
+            .navigationTitle("Performance Coach")
         }
     }
 }

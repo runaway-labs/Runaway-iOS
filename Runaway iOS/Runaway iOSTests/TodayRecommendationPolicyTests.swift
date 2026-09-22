@@ -1936,3 +1936,37 @@ extension TodayRecommendationPolicyTests {
         #expect(updated.weekStats(with: [activity]).actualMiles == 0)
     }
 }
+
+struct BiometricSyncPlanTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    @Test func initialSyncBackfillsThirtyCalendarDays() {
+        let today = calendar.date(from: DateComponents(year: 2026, month: 9, day: 22))!
+        let dates = BiometricSyncPlan.dates(
+            endingOn: today,
+            completedInitialBackfill: false,
+            calendar: calendar
+        )
+
+        #expect(dates.count == 30)
+        #expect(dates.first == calendar.date(from: DateComponents(year: 2026, month: 8, day: 24)))
+        #expect(dates.last == today)
+    }
+
+    @Test func subsequentSyncRefreshesThreeCalendarDays() {
+        let today = calendar.date(from: DateComponents(year: 2026, month: 9, day: 22))!
+        let dates = BiometricSyncPlan.dates(
+            endingOn: today,
+            completedInitialBackfill: true,
+            calendar: calendar
+        )
+
+        #expect(dates.count == 3)
+        #expect(dates.first == calendar.date(from: DateComponents(year: 2026, month: 9, day: 20)))
+        #expect(dates.last == today)
+    }
+}

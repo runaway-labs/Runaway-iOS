@@ -41,15 +41,35 @@ struct Runaway_iOSTests {
     }
 
     @Test func primaryTabsFollowTheRunnerJourney() {
-        #expect(RunawayTab.allCases.map(\.title) == ["Today", "Activities", "Plan", "You"])
+        #expect(RunawayTab.allCases.map(\.title) == ["Today", "Plan", "Activities", "You"])
         #expect(RunawayTab.today.systemImage == "sun.max.fill")
         #expect(RunawayTab.plan.systemImage == "calendar.badge.clock")
     }
 
     @Test func athleteAccountRowsResolveToActions() {
-        #expect(AthleteAccountItem.devicesAndSensors.action == .systemSettings)
+        #expect(AthleteAccountItem.devicesAndSensors.action == .integrations)
         #expect(AthleteAccountItem.trainingPreferences.action == .trainingPreferences)
         #expect(AthleteAccountItem.notifications.action == .systemSettings)
+    }
+
+    @Test func deviceIdentityUsesNewestPhysicalDeviceInsteadOfSoftwareSources() {
+        let activities = [
+            Activity(id: 1, activity_date: 300, device_name: "Strava App", source: "strava"),
+            Activity(id: 2, activity_date: 200, device_name: "Garmin fēnix 8", source: "strava"),
+            Activity(id: 3, activity_date: 100, device_name: "Apple Watch Series 7", source: "strava")
+        ]
+
+        #expect(DeviceIdentityPresentation.subtitle(
+            activities: activities,
+            garminConnected: true
+        ) == "Garmin fēnix 8")
+    }
+
+    @Test func deviceIdentityFallsBackToGarminConnection() {
+        #expect(DeviceIdentityPresentation.subtitle(
+            activities: [],
+            garminConnected: true
+        ) == "Garmin Connect")
     }
 
     @Test func manualRaceEditKeepsIdentityAndPrefillsDraft() throws {

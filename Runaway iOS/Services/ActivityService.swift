@@ -105,7 +105,9 @@ class ActivityService {
                 distance,
                 activity_date,
                 elapsed_time,
-                elevation_gain
+                elevation_gain,
+                device_name,
+                source
                 """
             )
             .eq("athlete_id", value: userId)

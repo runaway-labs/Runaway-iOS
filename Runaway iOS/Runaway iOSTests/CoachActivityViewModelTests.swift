@@ -20,6 +20,25 @@ final class CoachActivityViewModelTests: XCTestCase {
         }
     }
 
+    func testRecommendationJournalKeepsExactDeliveredWorkoutAndOpenState() throws {
+        try withSystem { ledger, plan in
+            let entry = CoachRecommendationJournalEntry(
+                id: UUID(), athleteID: 1, workout: plan.workouts[0],
+                whyToday: "Build aerobic durability without adding intensity.",
+                recommendationOnly: false, deliveredAt: Date(timeIntervalSince1970: 300), openedAt: nil
+            )
+            try ledger.saveRecommendation(entry)
+            let model = CoachActivityViewModel(ledger: ledger, currentPlan: { plan }, activate: { _, _ in })
+
+            try model.load(athleteID: 1)
+            XCTAssertEqual(model.recommendations.first?.workout.duration, 40)
+            XCTAssertNil(model.recommendations.first?.openedAt)
+
+            try model.openRecommendation(entry.id, athleteID: 1)
+            XCTAssertNotNil(model.recommendations.first?.openedAt)
+        }
+    }
+
     func testApprovalActivatesProposedPlanAndStaleApprovalExplainsFailure() throws {
         try withSystem { ledger, original in
             let proposed = plan(duration: 25)
@@ -44,6 +63,37 @@ final class CoachActivityViewModelTests: XCTestCase {
             XCTAssertThrowsError(try model.accept(stale.id))
             XCTAssertNotNil(model.errorMessage)
         }
+    }
+
+    func testWorkoutFingerprintChangesForDoseButNotCompletionState() throws {
+        let original = workout(duration: 40, distance: 4)
+        let changedDose = workout(duration: 45, distance: 4)
+        let completed = workout(duration: 40, distance: 4, completed: true)
+
+        XCTAssertNotEqual(
+            try WorkoutPrescriptionFingerprint.make(original),
+            try WorkoutPrescriptionFingerprint.make(changedDose)
+        )
+        XCTAssertEqual(
+            try WorkoutPrescriptionFingerprint.make(original),
+            try WorkoutPrescriptionFingerprint.make(completed)
+        )
+    }
+
+    func testWorkoutCommitmentRoundTripsInsideWorkout() throws {
+        let base = workout(duration: 45, distance: nil)
+        let commitment = WorkoutCommitment(
+            committedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            source: .alternative,
+            prescriptionFingerprint: try WorkoutPrescriptionFingerprint.make(base),
+            originalWorkoutID: "original"
+        )
+        let committed = workout(duration: 45, distance: nil, commitment: commitment)
+
+        let data = try JSONEncoder().encode(committed)
+        let decoded = try JSONDecoder().decode(DailyWorkout.self, from: data)
+
+        XCTAssertEqual(decoded.commitment, commitment)
     }
 
     private func withSystem(_ body: (CoachDecisionLedger, WeeklyTrainingPlan) throws -> Void) throws {
@@ -77,5 +127,20 @@ final class CoachActivityViewModelTests: XCTestCase {
     }
 
     private func plan(duration: Int) -> WeeklyTrainingPlan { Self.plan(duration: duration) }
+    private func workout(
+        duration: Int,
+        distance: Double?,
+        completed: Bool = false,
+        commitment: WorkoutCommitment? = nil
+    ) -> DailyWorkout {
+        DailyWorkout(
+            id: "today", date: Date(timeIntervalSince1970: 1_800_000_000),
+            dayOfWeek: .monday, workoutType: distance == nil ? .strengthTraining : .easyRun,
+            title: distance == nil ? "Strength" : "Easy run", description: "Test prescription",
+            duration: duration, distance: distance, targetPace: distance == nil ? nil : "10:00 /mi",
+            exercises: nil, isCompleted: completed, completedActivityId: nil,
+            commitment: commitment
+        )
+    }
     private static let encoder: JSONEncoder = { let value = JSONEncoder(); value.outputFormatting = .sortedKeys; return value }()
 }

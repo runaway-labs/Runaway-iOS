@@ -55,7 +55,6 @@ struct ActivitiesView: View {
                         Label("\(message) Retry", systemImage: "arrow.clockwise").font(.caption)
                     }.frame(minHeight: 44)
                 }
-                CompactCommitmentCard()
                 if visibleActivities.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         if progress.isRefreshing || dataManager.isLoadingActivities { ProgressView() }

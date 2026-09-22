@@ -99,7 +99,6 @@ enum OnboardingStep: Int, CaseIterable, Sendable {
         .trainingSchedule,
         .experienceAssessment,
         .movementTest,
-        .runnerMindset,
         .locationPermission,
         .coachSelection,
         .completion,
@@ -185,6 +184,7 @@ enum OnboardingStep: Int, CaseIterable, Sendable {
         trainingDraftFlowVersion: Int?
     ) -> OnboardingStep? {
         guard let persisted = OnboardingStep(rawValue: persistedRawValue) else { return nil }
+        if persisted == .runnerMindset { return .locationPermission }
         let legacyLaterSteps: Set<OnboardingStep> = [
             .experienceAssessment,
             .movementTest,

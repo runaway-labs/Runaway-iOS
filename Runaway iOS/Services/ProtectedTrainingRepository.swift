@@ -241,6 +241,38 @@ final class ProtectedTrainingRepository {
         )
     }
 
+    func coachRecommendationEntries(athleteID: Int) throws -> [CoachRecommendationJournalEntry] {
+        try requireOwner(athleteID)
+        let folder = directory(athleteID).appendingPathComponent("coach-recommendations", isDirectory: true)
+        guard files.fileExists(atPath: folder.path) else { return [] }
+        return try files.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .map { url in
+                let entry = try JSONDecoder().decode(
+                    CoachRecommendationJournalEntry.self,
+                    from: Data(contentsOf: url)
+                )
+                guard entry.athleteID == athleteID, entry.isValid,
+                      url.deletingPathExtension().lastPathComponent == entry.id.uuidString else {
+                    throw RepositoryError.invalidRecord
+                }
+                return entry
+            }
+            .sorted { $0.deliveredAt < $1.deliveredAt }
+    }
+
+    func saveCoachRecommendationEntry(_ entry: CoachRecommendationJournalEntry, athleteID: Int) throws {
+        try requireOwner(athleteID)
+        guard entry.athleteID == athleteID, entry.isValid else {
+            throw RepositoryError.ownershipMismatch
+        }
+        try write(
+            entry,
+            to: directory(athleteID).appendingPathComponent("coach-recommendations", isDirectory: true)
+                .appendingPathComponent(entry.id.uuidString + ".json")
+        )
+    }
+
     func coachDecisions(athleteID: Int) throws -> [CoachDecision] {
         try requireOwner(athleteID)
         let folder = directory(athleteID).appendingPathComponent("coach-decisions", isDirectory: true)

@@ -14,6 +14,37 @@ enum SchedulingReason: String, Equatable, Sendable {
     case highIntensityReadinessConflict
     case trainingDayLimit
     case taperProtectedLoad
+
+    var coachingDescription: String {
+        switch self {
+        case .requiredPrimary:
+            "Scheduled to move your primary goal forward."
+        case .profileFrequency:
+            "Selected to support your weekly training mix."
+        case .preservesLegRecovery:
+            "Placed here to preserve leg recovery around harder running."
+        case .supportsRecovery:
+            "Selected to support recovery while keeping your routine moving."
+        case .fillsAvailableDay:
+            "Matched to an available training day in your week."
+        case .restRequired:
+            "Rest is scheduled here to protect recovery and future quality work."
+        case .unavailableDay:
+            "No workout is scheduled because this day is unavailable."
+        case .completedWorkoutProtected:
+            "Kept because completed training should not be rewritten."
+        case .unselectedActivity:
+            "Excluded because this activity is not in your training mix."
+        case .lowerBodyRecoveryConflict:
+            "Avoided here to protect lower-body recovery."
+        case .highIntensityReadinessConflict:
+            "Avoided because today's readiness does not support high intensity."
+        case .trainingDayLimit:
+            "Limited to match the number of training days in your profile."
+        case .taperProtectedLoad:
+            "Kept lighter to protect your taper."
+        }
+    }
 }
 
 enum SchedulingReadiness: String, Equatable, Sendable {
