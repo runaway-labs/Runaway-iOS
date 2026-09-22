@@ -7,6 +7,7 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
     @Published private(set) var observations: [TrainingObservation] = []
     @Published private(set) var loaded = false
     @Published private(set) var isImporting = false
+    @Published private(set) var isSaving = false
     @Published var errorMessage: String?
     @Published var receipt: String?
 
@@ -44,19 +45,40 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
             observations = evidence
             loaded = true
             errorMessage = nil
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    if let reconciled = try await store.loadReconciled(athleteID: athleteID) {
+                        draft = reconciled
+                    }
+                    if case .unsynced(let message) = store.syncState {
+                        errorMessage = "Using your protected profile while cloud sync retries. \(message)"
+                    }
+                } catch is CancellationError {
+                } catch {
+                    errorMessage = "Could not refresh your training profile. Your protected copy is still available. \(error.localizedDescription)"
+                }
+            }
         } catch {
             errorMessage = "Could not open training data. Existing files were preserved. \(error.localizedDescription)"
         }
     }
 
     func save() {
-        guard loaded else { return }
-        do {
-            try store.save(draft, athleteID: athleteID)
-            if let saved = store.profile { draft = saved }
-            errorMessage = nil
-            receipt = "Profile saved securely. Runaway will sync it without changing your current plan."
-        } catch { errorMessage = error.localizedDescription }
+        guard loaded, !isSaving else { return }
+        isSaving = true
+        errorMessage = nil
+        receipt = nil
+        Task { [weak self] in
+            guard let self else { return }
+            defer { isSaving = false }
+            do {
+                draft = try await store.saveAndSync(draft, athleteID: athleteID)
+                receipt = "Training profile saved securely and synced."
+            } catch {
+                errorMessage = "Your changes are protected on this phone but have not synced yet. \(error.localizedDescription)"
+            }
+        }
     }
 
     func importRuns(_ activities: [Activity]) {
@@ -120,6 +142,7 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
         observations = []
         loaded = false
         isImporting = false
+        isSaving = false
         errorMessage = nil
         receipt = nil
         store.clearSession()

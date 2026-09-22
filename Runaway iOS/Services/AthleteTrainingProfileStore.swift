@@ -15,8 +15,16 @@ protocol AthleteTrainingProfilePersisting {
 /// Local-only profile facade. Sensitive records live in protected files, not preferences.
 @MainActor
 final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfilePersisting {
+    enum SyncState: Equatable {
+        case idle
+        case syncing
+        case saved
+        case unsynced(String)
+    }
+
     @Published private var storedProfile: AthleteTrainingProfile?
     @Published private(set) var accountID: Int?
+    @Published private(set) var syncState: SyncState = .idle
 
     var profile: AthleteTrainingProfile? {
         guard let accountID, activeAthleteID() == accountID else { return nil }
@@ -55,6 +63,44 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
         return loaded
     }
 
+    func loadReconciled(athleteID: Int) async throws -> AthleteTrainingProfile? {
+        try requireOwner(athleteID)
+        syncTask?.cancel()
+        storedProfile = nil
+        accountID = athleteID
+        var local = try repository.loadProfile(athleteID: athleteID)
+        local?.migrateLegacyGoalsToOutcomes()
+        storedProfile = local
+        syncState = .syncing
+
+        do {
+            let fetched = try await remote.fetch(activeAthleteID: athleteID)
+            try Task.checkCancellation()
+            try requireOwner(athleteID)
+            var remoteProfile = fetched
+            remoteProfile?.migrateLegacyGoalsToOutcomes()
+            let resolved: AthleteTrainingProfile?
+            if let remoteProfile, local == nil || remoteProfile.updatedAt > local!.updatedAt {
+                resolved = remoteProfile
+                try repository.saveProfile(remoteProfile, athleteID: athleteID)
+            } else {
+                resolved = local
+            }
+            storedProfile = resolved
+            syncState = .saved
+            return resolved
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if local != nil {
+                syncState = .unsynced(error.localizedDescription)
+                return local
+            }
+            syncState = .unsynced(error.localizedDescription)
+            throw error
+        }
+    }
+
     func save(_ profile: AthleteTrainingProfile, athleteID: Int) throws {
         try requireOwner(athleteID)
         guard profile.athleteID == athleteID else { throw StoreError.ownershipMismatch }
@@ -67,6 +113,31 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
         accountID = athleteID
         storedProfile = saved
         queueRemoteSync(saved)
+    }
+
+    @discardableResult
+    func saveAndSync(_ profile: AthleteTrainingProfile, athleteID: Int) async throws -> AthleteTrainingProfile {
+        try requireOwner(athleteID)
+        guard profile.athleteID == athleteID else { throw StoreError.ownershipMismatch }
+        let issues = profile.validationIssues()
+        guard issues.isEmpty else { throw StoreError.invalidProfile(issues) }
+        var saved = profile
+        saved.revision = UUID()
+        saved.updatedAt = Date()
+        try repository.saveProfile(saved, athleteID: athleteID)
+        accountID = athleteID
+        storedProfile = saved
+        syncState = .syncing
+
+        do {
+            let receipt = try await remote.save(saved, activeAthleteID: athleteID)
+            guard receipt.revision == saved.revision else { throw StoreError.invalidSyncReceipt }
+            syncState = .saved
+            return saved
+        } catch {
+            syncState = .unsynced(error.localizedDescription)
+            throw error
+        }
     }
 
     /// Explicit, owner-checked migration of this feature's previous v2 preference blob.
@@ -89,16 +160,22 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
         syncTask = nil
         storedProfile = nil
         accountID = nil
+        syncState = .idle
     }
 
     private func queueRemoteSync(_ profile: AthleteTrainingProfile) {
         syncTask?.cancel()
+        syncState = .syncing
         syncTask = Task { [remote] in
-            do { _ = try await remote.save(profile, activeAthleteID: profile.athleteID) }
+            do {
+                _ = try await remote.save(profile, activeAthleteID: profile.athleteID)
+                syncState = .saved
+            }
             catch is CancellationError { }
             catch {
+                syncState = .unsynced(error.localizedDescription)
                 #if DEBUG
-                print("AthleteTrainingProfileStore: remote sync deferred")
+                print("AthleteTrainingProfileStore: remote sync deferred: \(error)")
                 #endif
             }
         }
@@ -113,7 +190,7 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
     }
 
     enum StoreError: LocalizedError {
-        case ownershipMismatch, unreadableProfile, confirmationRequired, profileAlreadyExists
+        case ownershipMismatch, unreadableProfile, confirmationRequired, profileAlreadyExists, invalidSyncReceipt
         case invalidProfile([TrainingProfileIssue])
 
         var errorDescription: String? {
@@ -122,6 +199,7 @@ final class AthleteTrainingProfileStore: ObservableObject, AthleteTrainingProfil
             case .unreadableProfile: return "This training profile could not be read. Its saved data has been preserved."
             case .confirmationRequired: return "Confirm that you want to import the existing profile for this account."
             case .profileAlreadyExists: return "A protected profile already exists. Import will not overwrite it."
+            case .invalidSyncReceipt: return "The server confirmed a different profile revision. Your local changes remain unsynced."
             case .invalidProfile(let issues): return issues.map(\.message).joined(separator: "\n")
             }
         }
