@@ -12,9 +12,32 @@ struct TodayWorkoutDecisionSheet: View {
         recommendedWorkout: DailyWorkout,
         startChoosing: Bool
     ) {
+        let athleteID = plan.athleteId
+        let profileStore = AthleteTrainingProfileStore(activeAthleteID: { athleteID })
+        var athleteProfile = try? profileStore.load(athleteID: athleteID)
+        athleteProfile?.migrateLegacyGoalsToOutcomes()
+        athleteProfile?.migrateStrengthRecommendations()
+
+        let repository = ProtectedTrainingRepository(activeAthleteID: { athleteID })
+        let observations = (try? repository.observations(athleteID: athleteID)) ?? []
+        let sessionResults = (try? repository.sessionResults(athleteID: athleteID)) ?? []
+        let unattributedStrengthDates = plan.workouts.compactMap { workout in
+            workout.isCompleted && workout.workoutType.isStrength && workout.strengthPrescription == nil
+                ? workout.date
+                : nil
+        }
+        let strengthHistory = StrengthZoneHistoryService.snapshot(
+            workouts: plan.workouts,
+            observations: observations,
+            sessionResults: sessionResults,
+            unattributedStrengthDates: unattributedStrengthDates,
+            generatedAt: recommendedWorkout.date
+        )
         _model = State(initialValue: TodayWorkoutDecisionViewModel(
             plan: plan, profile: profile, recommendedWorkout: recommendedWorkout,
-            date: recommendedWorkout.date
+            date: recommendedWorkout.date,
+            athleteProfile: athleteProfile,
+            strengthHistory: strengthHistory
         ))
         self.startChoosing = startChoosing
     }
