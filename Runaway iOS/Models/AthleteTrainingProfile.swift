@@ -202,7 +202,7 @@ struct TrainingBodyMeasurements: Codable, Equatable {
 }
 
 struct AthleteTrainingProfile: Codable, Equatable {
-    static let currentSchemaVersion = 2
+    static let currentSchemaVersion = 3
 
     var schemaVersion = Self.currentSchemaVersion
     var athleteID: Int
@@ -214,12 +214,17 @@ struct AthleteTrainingProfile: Codable, Equatable {
     var equipment: [StrengthEquipment] = []
     var reportedLimitations: String = ""
     var bodyMeasurements: TrainingBodyMeasurements?
+    var strengthRecommendations: StrengthRecommendationPreferences?
 
     var equalPriorityDisciplines: Set<TrainingDiscipline> {
         Set(goals.filter { $0.isActive && $0.priority == .equalPrimary }.map(\.discipline))
     }
 
     var resolvedOutcomes: [AthleteOutcome] { outcomes ?? AthleteOutcome.defaults }
+
+    var resolvedStrengthRecommendations: StrengthRecommendationPreferences {
+        strengthRecommendations ?? .default
+    }
 
     var outcomeValidationMessage: String? {
         resolvedOutcomes.isEmpty ? "Choose at least one training outcome." : nil
@@ -232,6 +237,15 @@ struct AthleteTrainingProfile: Codable, Equatable {
         if activeDisciplines.contains(.running) { migrated.append(.marathonReady) }
         if activeDisciplines.contains(.strength) { migrated.append(.leanStrong) }
         outcomes = migrated.isEmpty ? AthleteOutcome.defaults : migrated
+    }
+
+    mutating func migrateStrengthRecommendations() {
+        if strengthRecommendations == nil {
+            strengthRecommendations = .default
+        }
+        if schemaVersion < Self.currentSchemaVersion {
+            schemaVersion = Self.currentSchemaVersion
+        }
     }
 
     var needsGoalSetup: Bool { resolvedOutcomes.isEmpty }
