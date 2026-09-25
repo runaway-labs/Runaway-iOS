@@ -3,6 +3,21 @@ import XCTest
 
 @MainActor
 final class AthleteTrainingProfileRemoteServiceTests: XCTestCase {
+    func testStrengthRecommendationPreferencesSurviveProfileRoundTrip() throws {
+        var source = profile(athleteID: 1)
+        source.strengthRecommendations = StrengthRecommendationPreferences(
+            suggestionsEnabled: false,
+            availableZones: [.chest, .back, .core]
+        )
+
+        let encoded = try JSONEncoder().encode(source)
+        let decoded = try JSONDecoder().decode(AthleteTrainingProfile.self, from: encoded)
+
+        XCTAssertEqual(decoded.strengthRecommendations, source.strengthRecommendations)
+        XCTAssertEqual(decoded.resolvedStrengthRecommendations.availableZones, [.chest, .back, .core])
+        XCTAssertFalse(decoded.resolvedStrengthRecommendations.suggestionsEnabled)
+    }
+
     func testProfileSyncRejectsMismatchedAthleteOwnership() async {
         var requests = 0
         let remote = AthleteTrainingProfileRemoteService(transport: { _ in

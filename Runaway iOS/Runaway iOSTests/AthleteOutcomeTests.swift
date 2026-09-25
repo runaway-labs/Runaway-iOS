@@ -4,6 +4,47 @@ import Testing
 
 @Suite("Athlete outcomes")
 struct AthleteOutcomeTests {
+    @Test("Strength zones keep stable persisted identifiers")
+    func strengthZoneRawValuesAreStable() {
+        #expect(StrengthZone.allCases.map(\.rawValue) == [
+            "chest", "back", "shoulders", "arms", "legs", "core"
+        ])
+    }
+
+    @Test("Strength recommendations default to every available zone")
+    func strengthRecommendationDefaults() {
+        let preferences = StrengthRecommendationPreferences.default
+
+        #expect(preferences.suggestionsEnabled)
+        #expect(preferences.availableZones == Set(StrengthZone.allCases))
+    }
+
+    @Test("Every strength zone may be unavailable without inventing a reason")
+    func allStrengthZonesMayBeUnavailable() {
+        let preferences = StrengthRecommendationPreferences(
+            suggestionsEnabled: true,
+            availableZones: []
+        )
+
+        #expect(preferences.availableZones.isEmpty)
+    }
+
+    @Test("Schema version two profiles migrate to safe strength defaults")
+    func legacyProfileMigratesToSafeStrengthDefaults() throws {
+        var legacy = AthleteTrainingProfile(athleteID: 42)
+        legacy.schemaVersion = 2
+        let encoded = try JSONEncoder().encode(legacy)
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "strengthRecommendations")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        var decoded = try JSONDecoder().decode(AthleteTrainingProfile.self, from: legacyData)
+        decoded.migrateStrengthRecommendations()
+
+        #expect(decoded.schemaVersion == 3)
+        #expect(decoded.resolvedStrengthRecommendations == .default)
+    }
+
     @Test("Approved outcomes survive protected profile encoding")
     func outcomesRoundTrip() throws {
         var profile = AthleteTrainingProfile(athleteID: 42)

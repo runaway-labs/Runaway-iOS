@@ -68,16 +68,13 @@ enum TodayWorkoutChoicePolicy {
 
     private static func choice(for activity: TrainingActivity, context: Context) -> TodayWorkoutChoice {
         let type = workoutType(for: activity)
-        let blocker: TodayWorkoutChoice.Availability = activity == .strength && !context.hasStrengthBenchmarks
-            ? .blocked(.missingStrengthBenchmarks)
-            : .available
         return TodayWorkoutChoice(
             id: activity.rawValue,
             activity: activity,
             workoutType: type,
             title: title(for: activity),
             reason: reason(for: activity),
-            availability: blocker,
+            availability: .available,
             isRecommended: context.recommendedWorkout?.workoutType.activity == activity
         )
     }
@@ -157,7 +154,8 @@ enum TodayWorkoutChoicePolicy {
             isCompleted: workout.isCompleted, completedActivityId: workout.completedActivityId,
             acceptedPrescription: workout.acceptedPrescription,
             acceptedCompletion: workout.acceptedCompletion,
-            commitment: workout.commitment
+            commitment: workout.commitment,
+            strengthPrescription: workout.strengthPrescription
         )
     }
 }

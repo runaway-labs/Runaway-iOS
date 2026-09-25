@@ -37,6 +37,7 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
             let evidence = try repository.currentObservations(athleteID: athleteID)
             var profile = saved ?? AthleteTrainingProfile(athleteID: athleteID)
             profile.migrateLegacyGoalsToOutcomes()
+            profile.migrateStrengthRecommendations()
             for day in 1...7 where !profile.availability.contains(where: { $0.weekday == day }) {
                 profile.availability.append(TrainingDayAvailability(weekday: day, availableMinutes: 0))
             }
@@ -79,6 +80,22 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
                 errorMessage = "Your changes are protected on this phone but have not synced yet. \(error.localizedDescription)"
             }
         }
+    }
+
+    func setStrengthSuggestionsEnabled(_ enabled: Bool) {
+        var preferences = draft.resolvedStrengthRecommendations
+        preferences.suggestionsEnabled = enabled
+        draft.strengthRecommendations = preferences
+    }
+
+    func setStrengthZone(_ zone: StrengthZone, available: Bool) {
+        var preferences = draft.resolvedStrengthRecommendations
+        if available {
+            preferences.availableZones.insert(zone)
+        } else {
+            preferences.availableZones.remove(zone)
+        }
+        draft.strengthRecommendations = preferences
     }
 
     func importRuns(_ activities: [Activity]) {

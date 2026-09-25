@@ -73,7 +73,8 @@ enum RemainingWeekTrainingPolicy {
             targetPace: workout.displayTargetPace, exercises: workout.exercises,
             isCompleted: false, completedActivityId: nil,
             acceptedPrescription: workout.acceptedPrescription,
-            acceptedCompletion: nil, commitment: nil
+            acceptedCompletion: nil, commitment: nil,
+            strengthPrescription: workout.strengthPrescription
         )
     }
 
@@ -167,7 +168,8 @@ enum RemainingWeekTrainingPolicy {
                 completedActivityId: workout.completedActivityId,
                 acceptedPrescription: workout.acceptedPrescription,
                 acceptedCompletion: workout.acceptedCompletion,
-                commitment: workout.commitment
+                commitment: workout.commitment,
+                strengthPrescription: workout.strengthPrescription
             )
         }
         return AcceptedPrescriptionPlanPolicy.replacingWorkouts(

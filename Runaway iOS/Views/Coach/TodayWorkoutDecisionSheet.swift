@@ -12,9 +12,32 @@ struct TodayWorkoutDecisionSheet: View {
         recommendedWorkout: DailyWorkout,
         startChoosing: Bool
     ) {
+        let athleteID = plan.athleteId
+        let profileStore = AthleteTrainingProfileStore(activeAthleteID: { athleteID })
+        var athleteProfile = try? profileStore.load(athleteID: athleteID)
+        athleteProfile?.migrateLegacyGoalsToOutcomes()
+        athleteProfile?.migrateStrengthRecommendations()
+
+        let repository = ProtectedTrainingRepository(activeAthleteID: { athleteID })
+        let observations = (try? repository.observations(athleteID: athleteID)) ?? []
+        let sessionResults = (try? repository.sessionResults(athleteID: athleteID)) ?? []
+        let unattributedStrengthDates = plan.workouts.compactMap { workout in
+            workout.isCompleted && workout.workoutType.isStrength && workout.strengthPrescription == nil
+                ? workout.date
+                : nil
+        }
+        let strengthHistory = StrengthZoneHistoryService.snapshot(
+            workouts: plan.workouts,
+            observations: observations,
+            sessionResults: sessionResults,
+            unattributedStrengthDates: unattributedStrengthDates,
+            generatedAt: recommendedWorkout.date
+        )
         _model = State(initialValue: TodayWorkoutDecisionViewModel(
             plan: plan, profile: profile, recommendedWorkout: recommendedWorkout,
-            date: recommendedWorkout.date
+            date: recommendedWorkout.date,
+            athleteProfile: athleteProfile,
+            strengthHistory: strengthHistory
         ))
         self.startChoosing = startChoosing
     }
@@ -66,6 +89,15 @@ struct TodayWorkoutDecisionSheet: View {
     }
 
     @ViewBuilder private var decisionContent: some View {
+        if model.phase == .choosingStrengthZones {
+            StrengthZoneSelectionView(
+                recommendations: model.strengthRecommendations,
+                selection: model.strengthSelection,
+                errorMessage: model.errorMessage,
+                onToggle: model.toggleStrengthZone,
+                onBuild: { try? model.generateStrengthDraft(duration: $0) }
+            )
+        }
         if model.phase == .choosing {
             choiceCatalog
         }
@@ -224,11 +256,24 @@ struct TodayWorkoutPrescriptionEditor: View {
             }
             if let exercises = draft.workout.exercises {
                 ForEach(exercises) { exercise in
-                    HStack {
-                        Text(exercise.name).font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text("\(exercise.sets ?? 0) × \(exercise.reps ?? "-")")
-                            .font(.subheadline.monospacedDigit()).foregroundStyle(TrainingProgressStyle.secondary)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(exercise.name).font(.subheadline.weight(.semibold))
+                            Spacer()
+                            if let metadata = draft.workout.strengthPrescription {
+                                Text(metadata.supportingZones.contains(
+                                    StrengthExerciseCatalog.definition(id: exercise.id)?.primaryZone ?? .core
+                                ) ? "SUPPORT" : "FOCUS")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(TrainingProgressStyle.amber)
+                            }
+                        }
+                        Text("\(exercise.sets ?? 0) × \(exercise.reps ?? "-") · \(exercise.weight ?? "2 RIR")")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(TrainingProgressStyle.secondary)
+                        if let notes = exercise.notes {
+                            Text(notes).font(.caption2).foregroundStyle(TrainingProgressStyle.secondary)
+                        }
                     }
                 }
             }

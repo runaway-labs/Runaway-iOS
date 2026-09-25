@@ -41,6 +41,7 @@ struct SettingsView: View {
     @State private var showingWorkoutNotifications = false
     @State private var showingCoachActivity = false
     @State private var showingAthleteTrainingProfile = false
+    @State private var showingStrengthRecommendations = false
 
     private var colors: (background: Color, cardBg: Color, textPrimary: Color, textSecondary: Color) {
         if themeManager.isDarkMode {
@@ -67,6 +68,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: AppTheme.Spacing.lg) {
                     profileSection
+                    goalsSection
                     appSettingsSection
                     integrationsSection
                     supportSection
@@ -106,6 +108,11 @@ struct SettingsView: View {
             .sheet(isPresented: $showingAthleteTrainingProfile) {
                 if let athleteID = userSession.userId {
                     AthleteTrainingProfileView(athleteID: athleteID)
+                }
+            }
+            .sheet(isPresented: $showingStrengthRecommendations) {
+                if let athleteID = userSession.userId {
+                    StrengthRecommendationSettingsView(athleteID: athleteID)
                 }
             }
             .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
@@ -217,30 +224,30 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Goals Section
+    // MARK: - Your Training Section
 
     private var goalsSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-            Text("Goals")
+            Text("Your training")
                 .font(AppTheme.Typography.headline)
                 .foregroundColor(colors.textPrimary)
 
             SettingsRow(
                 icon: "figure.strengthtraining.traditional",
-                title: "Goals & Current Ability",
-                subtitle: "Measurable targets, actual performance, and availability",
+                title: "Training profile",
+                subtitle: "Goals, schedule, equipment, and current ability",
                 color: AppTheme.Colors.teal
             ) {
                 showingAthleteTrainingProfile = true
             }
 
             SettingsRow(
-                icon: "target",
-                title: "Running Goals",
-                subtitle: "Weekly: \(Int(GoalSettingsStore.shared.weeklyGoal)) mi • Monthly: \(Int(GoalSettingsStore.shared.monthlyGoal)) mi",
-                color: AppTheme.Colors.success
+                icon: "figure.strengthtraining.traditional",
+                title: "Strength recommendations",
+                subtitle: "Choose focus suggestions and available zones",
+                color: AppTheme.Colors.warmAmber
             ) {
-                showingGoalSettings = true
+                showingStrengthRecommendations = true
             }
         }
     }
