@@ -82,6 +82,22 @@ final class AthleteTrainingProfileEditorModel: ObservableObject {
         }
     }
 
+    func setStrengthSuggestionsEnabled(_ enabled: Bool) {
+        var preferences = draft.resolvedStrengthRecommendations
+        preferences.suggestionsEnabled = enabled
+        draft.strengthRecommendations = preferences
+    }
+
+    func setStrengthZone(_ zone: StrengthZone, available: Bool) {
+        var preferences = draft.resolvedStrengthRecommendations
+        if available {
+            preferences.availableZones.insert(zone)
+        } else {
+            preferences.availableZones.remove(zone)
+        }
+        draft.strengthRecommendations = preferences
+    }
+
     func importRuns(_ activities: [Activity]) {
         guard loaded, !isImporting else { return }
         isImporting = true
