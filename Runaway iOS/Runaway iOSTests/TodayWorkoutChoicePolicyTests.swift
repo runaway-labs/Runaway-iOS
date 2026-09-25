@@ -26,14 +26,14 @@ struct TodayWorkoutChoicePolicyTests {
         #expect(choices.contains { $0.workoutType == .rest })
     }
 
-    @Test func unsupportedStrengthDoseRemainsVisibleWithBlocker() throws {
+    @Test func strengthRemainsAvailableWithoutBenchmarks() throws {
         var profile = TrainingProfile.runningFirstDefault
         profile.activities.append(.init(activity: .strength, role: .supporting, sessionsPerWeek: 1))
         let choices = TodayWorkoutChoicePolicy.choices(
             context: .init(profile: profile, hasStrengthBenchmarks: false)
         )
         let strength = try #require(choices.first { $0.activity == .strength })
-        #expect(strength.availability == .blocked(.missingStrengthBenchmarks))
+        #expect(strength.availability == .available)
     }
 
     @Test func nonRunningDraftNeverCarriesPace() throws {

@@ -93,7 +93,8 @@ struct TodayWorkoutDraft {
                 targetPace: workout.displayTargetPace, exercises: workout.exercises,
                 isCompleted: false, completedActivityId: nil,
                 acceptedPrescription: workout.acceptedPrescription,
-                acceptedCompletion: nil, commitment: nil
+                acceptedCompletion: nil, commitment: nil,
+                strengthPrescription: workout.strengthPrescription
             ),
             source: source,
             reason: reason

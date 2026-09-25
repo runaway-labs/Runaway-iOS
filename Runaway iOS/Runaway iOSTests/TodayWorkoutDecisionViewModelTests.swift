@@ -23,7 +23,7 @@ struct TodayWorkoutDecisionViewModelTests {
         #expect(model.phase == .committed)
     }
 
-    @Test func blockedChoiceExplainsWhyAndCannotPreview() throws {
+    @Test func strengthChoiceEntersZoneSelectionWithoutBenchmarks() throws {
         var profile = TrainingProfile.runningFirstDefault
         profile.activities.append(.init(activity: .strength, role: .supporting, sessionsPerWeek: 1))
         let plan = planFixture()
@@ -33,8 +33,48 @@ struct TodayWorkoutDecisionViewModelTests {
         )
         model.load()
         model.select("strength")
-        #expect(model.blockerMessage == "Add current strength benchmarks to build a complete strength prescription.")
+        #expect(model.phase == .choosingStrengthZones)
         #expect(model.canPreview == false)
+    }
+
+    @Test func multipleZonesGenerateAnExactStrengthDraft() throws {
+        var profile = TrainingProfile.runningFirstDefault
+        profile.activities.append(.init(activity: .strength, role: .supporting, sessionsPerWeek: 1))
+        let plan = planFixture()
+        let model = TodayWorkoutDecisionViewModel(
+            plan: plan, profile: profile, recommendedWorkout: plan.workouts[0],
+            date: plan.workouts[0].date
+        )
+        model.load()
+        model.select("strength")
+        model.toggleStrengthZone(.core)
+        model.toggleStrengthZone(.back)
+
+        try model.generateStrengthDraft(duration: 45)
+
+        #expect(model.phase == .editing)
+        #expect(model.draft?.workout.strengthPrescription?.focusZones == [.core, .back])
+        #expect(model.draft?.workout.exercises?.isEmpty == false)
+    }
+
+    @Test func unavailableZonesNeverAppearButDeprioritizedLegsRemainSelectable() {
+        var profile = TrainingProfile.runningFirstDefault
+        profile.activities.append(.init(activity: .strength, role: .supporting, sessionsPerWeek: 1))
+        var athlete = AthleteTrainingProfile(athleteID: 42)
+        athlete.strengthRecommendations = .init(
+            suggestionsEnabled: true,
+            availableZones: [.back, .legs, .core]
+        )
+        let plan = planFixture()
+        let model = TodayWorkoutDecisionViewModel(
+            plan: plan, profile: profile, recommendedWorkout: plan.workouts[0],
+            date: plan.workouts[0].date, athleteProfile: athlete
+        )
+        model.load()
+        model.select("strength")
+
+        #expect(Set(model.strengthRecommendations.map(\.zone)) == [.back, .legs, .core])
+        #expect(model.strengthRecommendations.first(where: { $0.zone == .legs })?.isSelectable == true)
     }
 
     private func planFixture() -> WeeklyTrainingPlan {
