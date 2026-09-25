@@ -26,6 +26,7 @@ enum WorkoutPrescriptionFingerprint {
         let targetPace: String?
         let exercises: [Exercise]?
         let acceptedPrescription: AcceptedTrainingPrescription?
+        let strengthPrescription: StrengthPrescriptionMetadata?
     }
 
     static func make(_ workout: DailyWorkout) throws -> String {
@@ -41,7 +42,8 @@ enum WorkoutPrescriptionFingerprint {
                 distance: workout.distance,
                 targetPace: workout.displayTargetPace,
                 exercises: workout.exercises,
-                acceptedPrescription: workout.acceptedPrescription
+                acceptedPrescription: workout.acceptedPrescription,
+                strengthPrescription: workout.strengthPrescription
             )
         )
     }

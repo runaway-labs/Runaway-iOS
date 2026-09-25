@@ -102,6 +102,7 @@ enum TodayWorkoutDecisionService {
         )
         committed.acceptedPrescription = workout.acceptedPrescription
         committed.acceptedCompletion = workout.acceptedCompletion
+        committed.strengthPrescription = workout.strengthPrescription
         committed.commitment = WorkoutCommitment(
             committedAt: now,
             source: .recommendation,
@@ -131,7 +132,8 @@ enum TodayWorkoutDecisionService {
             targetPace: workout.displayTargetPace, exercises: workout.exercises,
             isCompleted: false, completedActivityId: nil,
             acceptedPrescription: workout.acceptedPrescription,
-            acceptedCompletion: nil, commitment: commitment
+            acceptedCompletion: nil, commitment: commitment,
+            strengthPrescription: workout.strengthPrescription
         )
     }
 }

@@ -85,3 +85,27 @@ struct TodayWorkoutDecisionServiceTests {
         )
     }
 }
+
+extension TodayWorkoutDecisionServiceTests {
+    @Test func generatedStrengthMetadataSurvivesCodableAndFingerprinting() throws {
+        let metadata = StrengthPrescriptionMetadata(
+            policyVersion: "test-v1",
+            focusZones: [.core, .back],
+            supportingZones: [.arms],
+            exerciseIDs: ["dead_bug", "one_arm_dumbbell_row"]
+        )
+        var workout = DailyWorkout(
+            id: "strength-metadata", date: Date(timeIntervalSince1970: 1_800_000_000),
+            dayOfWeek: .monday, workoutType: .strengthTraining, title: "Core + Back",
+            description: "Generated strength prescription", duration: 45, distance: nil,
+            targetPace: nil, exercises: [], isCompleted: false, completedActivityId: nil
+        )
+        workout.strengthPrescription = metadata
+
+        let encoded = try JSONEncoder().encode(workout)
+        let decoded = try JSONDecoder().decode(DailyWorkout.self, from: encoded)
+
+        #expect(decoded.strengthPrescription == metadata)
+        #expect(try WorkoutPrescriptionFingerprint.make(decoded) == WorkoutPrescriptionFingerprint.make(workout))
+    }
+}

@@ -12,6 +12,7 @@ struct AcceptedTrainingPrescription: Codable, Equatable {
     let evidenceIDs: [UUID]
     let rationale: String
     let acceptedAt: Date
+    var strengthPrescription: StrengthPrescriptionMetadata? = nil
 }
 
 struct AcceptedPrescriptionPlanReceipt: Codable, Identifiable {
