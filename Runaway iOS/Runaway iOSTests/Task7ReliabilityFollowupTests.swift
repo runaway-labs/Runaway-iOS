@@ -662,6 +662,36 @@ final class OnboardingTrainingProfileTests: XCTestCase {
         XCTAssertEqual(OnboardingStep.experienceAssessment.rawValue, 3)
     }
 
+    func testProfileMigrationPreservesGoalsAvailabilityEquipmentAndLimitations() {
+        let availability = [
+            TrainingDayAvailability(weekday: 2, availableMinutes: 75, allowsTwoSessions: true),
+            TrainingDayAvailability(weekday: 5, availableMinutes: 45, allowsTwoSessions: false),
+        ]
+        var profile = AthleteTrainingProfile(
+            schemaVersion: 2,
+            athleteID: 42,
+            outcomes: [.marathonReady, .leanStrong, .durableCore],
+            goals: [],
+            availability: availability,
+            equipment: [.bodyweight, .dumbbells, .fullGym],
+            reportedLimitations: "Avoid high-impact jumping.",
+            bodyMeasurements: nil,
+            strengthRecommendations: nil
+        )
+        let goals = profile.goals
+        let equipment = profile.equipment
+        let limitations = profile.reportedLimitations
+
+        profile.migrateStrengthRecommendations()
+
+        XCTAssertEqual(profile.schemaVersion, AthleteTrainingProfile.currentSchemaVersion)
+        XCTAssertEqual(profile.goals, goals)
+        XCTAssertEqual(profile.availability, availability)
+        XCTAssertEqual(profile.equipment, equipment)
+        XCTAssertEqual(profile.reportedLimitations, limitations)
+        XCTAssertEqual(profile.strengthRecommendations, .default)
+    }
+
     private var trainingFixture: TrainingProfile {
         TrainingProfile(
             schemaVersion: TrainingProfile.currentSchemaVersion,

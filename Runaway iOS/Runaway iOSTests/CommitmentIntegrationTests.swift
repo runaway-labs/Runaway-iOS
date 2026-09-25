@@ -104,6 +104,79 @@ struct CommitmentIntegrationTests {
         #expect(reconciled.workout(for: .thursday)?.workoutType == .easyRun)
     }
 
+    @Test func selectedZonesGenerateCommitAndSurvivePlanReload() throws {
+        let date = Calendar.current.startOfDay(for: Date())
+        let history = StrengthZoneHistorySnapshot(
+            generatedAt: date, exposures: [:], hasUnattributedStrengthWork: false
+        )
+        let generated = try StrengthWorkoutGenerator.generate(.init(
+            selectedZones: [.back, .core],
+            availableZones: Set(StrengthZone.allCases),
+            durationMinutes: 45,
+            equipment: .fullGym,
+            experience: .intermediate,
+            outcomes: [.marathonReady, .leanStrong, .durableCore],
+            history: history,
+            upcomingWorkouts: []
+        ))
+        var prescribed = DailyWorkout(
+            id: "generated-strength", date: date, dayOfWeek: .from(date: date),
+            workoutType: .fullBody, title: "Back + Core", description: generated.explanation,
+            duration: 45, distance: nil, targetPace: nil,
+            exercises: generated.planExercises, isCompleted: false, completedActivityId: nil
+        )
+        prescribed.strengthPrescription = generated.metadata
+        let original = DailyWorkout(
+            id: "today", date: date, dayOfWeek: .from(date: date), workoutType: .walking,
+            title: "Walking", description: "Recovery", duration: 40, distance: nil,
+            targetPace: nil, exercises: nil, isCompleted: false, completedActivityId: nil
+        )
+        let plan = WeeklyTrainingPlan(
+            id: "strength-week", athleteId: 42, weekStartDate: date, weekEndDate: date,
+            workouts: [original], weekNumber: 1, totalMileage: 0, focusArea: "Balanced",
+            notes: nil, generatedAt: date, goalId: nil
+        )
+        let draft = TodayWorkoutDraft(
+            workout: prescribed, source: .custom,
+            reason: "Built around selected strength zones."
+        )
+
+        let preview = try TodayWorkoutDecisionService.preview(
+            draft: draft, currentPlan: plan, now: date
+        )
+        let committed = try TodayWorkoutDecisionService.commit(
+            preview: preview, currentPlan: plan
+        )
+        let data = try JSONEncoder().encode(committed)
+        let reloaded = try JSONDecoder().decode(WeeklyTrainingPlan.self, from: data)
+        let workout = try #require(reloaded.workouts.first)
+
+        #expect(workout.commitment != nil)
+        #expect(workout.exercises?.isEmpty == false)
+        #expect(workout.strengthPrescription?.focusZones == [.back, .core])
+        #expect(workout.strengthPrescription?.exerciseIDs == generated.exercises.map(\.id))
+    }
+
+    @Test func excludedZoneCannotReturnThroughSupportingWork() throws {
+        let available = Set(StrengthZone.allCases).subtracting([.legs])
+        let generated = try StrengthWorkoutGenerator.generate(.init(
+            selectedZones: [.back, .core],
+            availableZones: available,
+            durationMinutes: 60,
+            equipment: .fullGym,
+            experience: .advanced,
+            outcomes: [.leanStrong, .durableCore],
+            history: .init(generatedAt: Date(), exposures: [:], hasUnattributedStrengthWork: false),
+            upcomingWorkouts: []
+        ))
+
+        #expect(!generated.metadata.focusZones.contains(.legs))
+        #expect(!generated.metadata.supportingZones.contains(.legs))
+        #expect(generated.exercises.allSatisfy {
+            $0.primaryZone != .legs && !$0.secondaryZones.contains(.legs)
+        })
+    }
+
     private func planFixture(committed: Bool) throws -> WeeklyTrainingPlan {
         let date = Calendar.current.startOfDay(for: Date())
         var workout = DailyWorkout(

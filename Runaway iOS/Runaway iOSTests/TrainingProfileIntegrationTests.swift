@@ -483,7 +483,7 @@ struct TrainingProfileIntegrationTests {
         expectExactlyEqual(preserved, completedRun)
     }
 
-    @Test @MainActor func nonRunningActivityCannotCompleteRunAndPolicyStillSchedulesSelectedSupport() async throws {
+    @Test @MainActor func nonRunningActivityReplacesSameDayRunAndUpdatesRunningMileage() async throws {
         let restoreCache = snapshotStandardCache()
         defer { restoreCache() }
         let plan = runningOnlyPlan()
@@ -509,12 +509,14 @@ struct TrainingProfileIntegrationTests {
                 trainingDays: 5
             )
         )
-        let untouchedRun = try #require(regenerated.workouts.first { $0.id == targetRun.id })
+        let recordedRide = try #require(regenerated.workouts.first { $0.id == targetRun.id })
 
-        expectExactlyEqual(untouchedRun, targetRun)
+        #expect(recordedRide.workoutType == .cycling)
+        #expect(recordedRide.isCompleted)
+        #expect(recordedRide.completedActivityId == ride.id)
         #expect(regenerated.workouts.filter { $0.workoutType == .cycling }.count == 1)
         #expect(regenerated.workouts.filter { $0.workoutType.isStrength }.isEmpty)
-        #expect(abs(regenerated.totalMileage - plan.totalMileage) < 0.001)
+        #expect(abs(regenerated.totalMileage - (plan.totalMileage - (targetRun.distance ?? 0))) < 0.001)
     }
 
     @Test @MainActor func establishedActivityRegenerationAnchorsRecordedRunAndAppliesProfilePolicy() async throws {
@@ -1899,6 +1901,66 @@ struct TrainingProfileIntegrationTests {
         } else {
             Issue.record("Expected the authenticated athlete to own the cached plan")
         }
+    }
+
+    @Test func completedGeneratedWorkoutFeedsAttributableZoneHistory() throws {
+        let completedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let generated = try StrengthWorkoutGenerator.generate(.init(
+            selectedZones: [.back, .core],
+            availableZones: Set(StrengthZone.allCases),
+            durationMinutes: 45,
+            equipment: .fullGym,
+            experience: .intermediate,
+            outcomes: [.leanStrong, .durableCore],
+            history: .init(generatedAt: completedAt, exposures: [:], hasUnattributedStrengthWork: false),
+            upcomingWorkouts: []
+        ))
+        let items = generated.exercises.enumerated().map { index, exercise in
+            TrainingSessionResult.Item(
+                id: "set-\(index)", title: exercise.name, kind: .strength,
+                exerciseID: exercise.id, seconds: nil, repetitions: 10...10,
+                convention: .bodyweight, loadKilograms: nil, assistanceKilograms: nil,
+                prescribedRepetitions: 10
+            )
+        }
+        let reference = TrainingSessionResult.Reference(
+            athleteID: 42, goalID: UUID(), goalTitle: "Strength",
+            fingerprint: "generated-strength", policyVersion: generated.metadata.policyVersion,
+            generatedAt: completedAt.addingTimeInterval(-3_600), distanceUnit: .miles,
+            massUnit: .pounds, prescribedSeconds: 2_700, items: items,
+            acceptedPrescriptionID: UUID()
+        )
+        let result = TrainingSessionResult(
+            id: UUID(), reference: reference, completedAt: completedAt, recordedAt: completedAt,
+            elapsedSeconds: 2_700, perceivedEffort: 7, bodyState: .good,
+            entries: items.map {
+                TrainingSessionResult.Entry(
+                    itemID: $0.id, skipped: false, seconds: nil, repetitions: 10,
+                    loadKilograms: nil, assistanceKilograms: nil, repsInReserve: 2
+                )
+            }
+        )
+
+        let snapshot = StrengthZoneHistoryService.snapshot(
+            workouts: [], observations: [], sessionResults: [result],
+            unattributedStrengthDates: [], generatedAt: completedAt
+        )
+
+        #expect(snapshot.exposures[.back] != nil)
+        #expect(snapshot.exposures[.core] != nil)
+        #expect(snapshot.exposures.values.allSatisfy { $0.sourceResultIDs == [result.id] })
+        #expect(!snapshot.hasUnattributedStrengthWork)
+    }
+
+    @Test func genericImportedStrengthRemainsUnattributed() {
+        let importedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let snapshot = StrengthZoneHistoryService.snapshot(
+            workouts: [], observations: [], sessionResults: [],
+            unattributedStrengthDates: [importedAt], generatedAt: importedAt
+        )
+
+        #expect(snapshot.exposures.isEmpty)
+        #expect(snapshot.hasUnattributedStrengthWork)
     }
 
     private actor PlanGenerationGate {
