@@ -379,7 +379,7 @@ struct TrainingScheduleEditor: View {
                         }
                     }
                     .labelsHidden()
-                    .tint(AppTheme.Colors.adaptiveAccent)
+                    .tint(AppTheme.Colors.accent)
                 }
                 .frame(minHeight: AppTheme.Layout.touchTargetMinimum)
 

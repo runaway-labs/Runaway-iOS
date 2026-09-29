@@ -738,10 +738,10 @@ struct CompactWorkoutRow: View {
                     Text(workout.dayOfWeek.shortName)
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundColor(isToday ? .white : AppTheme.Colors.adaptiveTextSecondary)
+                        .foregroundColor(isToday ? AppTheme.Colors.pine : AppTheme.Colors.adaptiveTextSecondary)
                 }
                 .frame(width: 36, height: 36)
-                .background(isToday ? AppTheme.Colors.accent : AppTheme.Colors.adaptiveSurfaceBackground)
+                .background(isToday ? AppTheme.Colors.strideLime : AppTheme.Colors.adaptiveSurfaceBackground)
                 .cornerRadius(8)
 
                 // Workout type icon

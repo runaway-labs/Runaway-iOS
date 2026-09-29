@@ -39,12 +39,19 @@ struct AppTheme {
         static let swimBlue  = Color(red: 0.251, green: 0.651, blue: 0.902) // #40A6E6
 
         // MARK: - Accent
-        // Dark-canvas action accent. Light-mode text and tint use moss via LightMode.accent
-        // and adaptiveAccent, because lime on chalk is about 1.2:1.
+        // Text and icon accent. Lime on a dark canvas, moss on a light one.
+        // Lime text on chalk is about 1.2:1, so fills use strideLime instead.
+        // Moss is in use while Design confirms the light accent.
         private static var isDarkModeFromDefaults: Bool {
             UserDefaults.standard.string(forKey: "app_theme_mode") != "light"
         }
-        static let accent = strideLime
+        static var accent: Color {
+            Color(UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(DarkMode.accent)
+                    : UIColor(LightMode.accent)
+            })
+        }
         static var accentLight: Color { strideLimePressed }
         static let accentDark = strideLimePressed
 
@@ -86,7 +93,7 @@ struct AppTheme {
         // MARK: - Icon colors
         static let iconPrimary  = Color.white
         static let iconSecondary = Color(red: 0.60, green: 0.63, blue: 0.68)
-        static let iconAccent   = strideLime
+        static var iconAccent: Color { accent }
         static let iconSuccess  = forestGreenLight
         static let iconWarning  = warning
         static let iconError    = error
@@ -458,7 +465,7 @@ extension View {
     func tertiaryButton() -> some View {
         self
             .font(AppTheme.Typography.bodyBold)
-            .foregroundColor(AppTheme.Colors.adaptiveAccent)
+            .foregroundColor(AppTheme.Colors.accent)
             .padding(.horizontal, AppTheme.Spacing.lg)
             .padding(.vertical, AppTheme.Spacing.sm)
     }
@@ -573,14 +580,6 @@ extension AppTheme.Colors {
         })
     }
 
-    /// Lime on a dark canvas, moss on a light canvas. Use for accent text and tint, not for button fills.
-    static var adaptiveAccent: Color {
-        Color(UIColor { trait in
-            trait.userInterfaceStyle == .dark
-                ? UIColor(AppTheme.Colors.DarkMode.accent)
-                : UIColor(AppTheme.Colors.LightMode.accent)
-        })
-    }
 }
 
 // MARK: - SF Symbols Icons

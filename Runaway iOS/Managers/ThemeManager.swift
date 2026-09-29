@@ -101,9 +101,9 @@ struct DynamicColors {
     }
 
     // MARK: - Accent
-    // Lime in dark mode. Moss in light mode, where lime text on chalk fails contrast.
+    // Same adaptive token as AppTheme.Colors.accent: lime in dark, moss in light.
     var accent: Color {
-        themeManager.isDarkMode ? AppTheme.Colors.DarkMode.accent : AppTheme.Colors.LightMode.accent
+        AppTheme.Colors.accent
     }
 
     // MARK: - Dividers & Borders

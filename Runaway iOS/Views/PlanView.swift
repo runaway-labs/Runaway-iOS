@@ -435,17 +435,28 @@ struct NextRaceCard: View {
                         .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
 
                     if race.runsignupRaceId != nil {
-                        Button { showingCourseRecon = true } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "mountain.2.fill")
-                                Text("Scout Course")
+                        HStack(spacing: 8) {
+                            Button { showingCourseRecon = true } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "mountain.2.fill")
+                                    Text("Scout Course")
+                                }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.pine)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(AppTheme.Colors.strideLime)
+                                .cornerRadius(20)
                             }
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(AppTheme.Colors.pine)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(urgencyColor)
-                            .cornerRadius(20)
+                            .buttonStyle(.plain)
+                            if daysUntil <= 7 {
+                                Label(
+                                    daysUntil == 0 ? "Race day" : "Race week",
+                                    systemImage: "exclamationmark.triangle.fill"
+                                )
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(daysUntil == 0 ? Color.red : AppTheme.Colors.warning)
+                            }
                         }
                         .padding(.top, 8)
                     }

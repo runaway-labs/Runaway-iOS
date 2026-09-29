@@ -84,7 +84,42 @@
         <td>Light-mode accent<br><span class="note">text and tint, not a lime label</span></td>
         <td><span class="swatch" style="background:#F2F2F5;color:#F59E0B">#F59E0B</span></td>
         <td><span class="swatch" style="background:#FAFBF6;color:#496550">#496550</span></td>
-        <td><span class="fail">Lime on chalk 1.20:1, not for text</span><br>Moss on chalk <span class="pass">6.19:1</span><br>Moss on current light canvas 5.76:1</td>
+        <td><span class="fail">Lime on chalk 1.20:1, not for text</span><br>Moss on chalk <span class="pass">6.19:1</span><br>Moss on white <span class="pass">6.44:1</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Light mode</h2>
+  <p class="lead">Chalk canvas with a white surface. Lime is the button fill only. Moss is the accent for text and icons while Design confirms it.</p>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Swatch</th><th>Contrast</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Chalk canvas<br><span class="note">#FAFBF6, pine text #202E28</span></td>
+        <td><span class="swatch" style="background:#FAFBF6;color:#202E28;border:1px solid #D5DDD6">Canvas</span></td>
+        <td>Pine on chalk <span class="pass">13.62:1</span></td>
+      </tr>
+      <tr>
+        <td>White surface<br><span class="note">#FFFFFF</span></td>
+        <td><span class="swatch" style="background:#FFFFFF;color:#202E28;border:1px solid #D5DDD6">Surface</span></td>
+        <td>Pine on white <span class="pass">14.16:1</span></td>
+      </tr>
+      <tr>
+        <td>Primary button<br><span class="note">lime fill, pine label</span></td>
+        <td><span class="swatch" style="background:#D6F35A;color:#202E28">Run</span></td>
+        <td>Pine on lime <span class="pass">11.35:1</span><br><span class="fail">Lime on white 1.25:1, not for text</span></td>
+      </tr>
+      <tr>
+        <td>Moss accent<br><span class="note">text and icon on chalk</span></td>
+        <td><span class="swatch" style="background:#FAFBF6;color:#496550;border:1px solid #D5DDD6">▲ Accent</span></td>
+        <td>Moss on chalk <span class="pass">6.19:1</span><br>Moss on white <span class="pass">6.44:1</span></td>
+      </tr>
+      <tr>
+        <td>Warning<br><span class="note">icon #E2B714 plus a pine label</span></td>
+        <td><span class="swatch" style="background:#FAFBF6;border:1px solid #D5DDD6"><span style="color:#E2B714">▲</span>&nbsp;<span style="color:#202E28">Warning</span></span></td>
+        <td>Warning color on chalk <span class="fail">1.83:1</span> (icon only)<br>Pine label on chalk <span class="pass">13.62:1</span></td>
       </tr>
     </tbody>
   </table>

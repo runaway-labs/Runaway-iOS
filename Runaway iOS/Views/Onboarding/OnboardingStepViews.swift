@@ -1080,8 +1080,8 @@ struct RunnerMindsetStepView: View {
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
-                            .background(canContinue ? Color.accentColor : Color.accentColor.opacity(0.3))
-                            .foregroundColor(.white)
+                            .background(canContinue ? AppTheme.Colors.strideLime : AppTheme.Colors.strideLime.opacity(0.3))
+                            .foregroundColor(AppTheme.Colors.pine)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .disabled(!canContinue)

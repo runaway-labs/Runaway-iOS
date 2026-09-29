@@ -97,7 +97,7 @@ struct MainView: View {
                     }
                 }
             }
-            .tint(AppTheme.Colors.adaptiveAccent)
+            .tint(AppTheme.Colors.accent)
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in
