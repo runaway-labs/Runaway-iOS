@@ -124,9 +124,15 @@ private struct SessionPrescriptionAcceptanceView: View {
                     Section("Nothing saved") { Text(errorMessage).foregroundStyle(.red) }
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Review your week")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                        .darkSurfaceTint()
+                }
+            }
         }
         .task {
             let loaded = await dataManager.loadPlanForPrescriptionAcceptance(athleteID: athleteID)

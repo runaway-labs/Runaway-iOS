@@ -58,9 +58,11 @@ struct CourseReconView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .task { await loadCourse() }
     }
 

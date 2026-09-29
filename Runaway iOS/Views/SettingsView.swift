@@ -81,10 +81,11 @@ struct SettingsView: View {
                 .padding(AppTheme.Spacing.md)
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .adaptiveSurfaceTint()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(themeManager.isDarkMode ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
             .sheet(isPresented: $showingStravaSheet) {
@@ -104,6 +105,8 @@ struct SettingsView: View {
                     CoachActivityView(athleteID: athleteID)
                 } else {
                     ContentUnavailableView("Sign in required", systemImage: "lock")
+                        .adaptiveSurfaceTint()
+                        .darkSurfaceTint()
                 }
             }
             .sheet(isPresented: $showingAthleteTrainingProfile) {
@@ -116,25 +119,29 @@ struct SettingsView: View {
                     StrengthRecommendationSettingsView(athleteID: athleteID)
                 }
             }
-            .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Disconnect", role: .destructive) {
-                    Task {
-                        await disconnectFromStrava()
+            .background {
+                Color.clear
+                    .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Disconnect", role: .destructive) {
+                            Task {
+                                await disconnectFromStrava()
+                            }
+                        }
+                    } message: {
+                        Text("Are you sure you want to disconnect from Strava? Your activities will no longer sync automatically.")
                     }
-                }
-            } message: {
-                Text("Are you sure you want to disconnect from Strava? Your activities will no longer sync automatically.")
-            }
-            .alert("Disconnect from Garmin", isPresented: $showingGarminDisconnectAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Disconnect", role: .destructive) {
-                    Task {
-                        await disconnectFromGarmin()
+                    .alert("Disconnect from Garmin", isPresented: $showingGarminDisconnectAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Disconnect", role: .destructive) {
+                            Task {
+                                await disconnectFromGarmin()
+                            }
+                        }
+                    } message: {
+                        Text("Are you sure you want to disconnect from Garmin Connect?")
                     }
-                }
-            } message: {
-                Text("Are you sure you want to disconnect from Garmin Connect?")
+                    .adaptiveSurfaceTint()
             }
             .task {
                 await stravaService.checkConnectionStatus()
@@ -144,6 +151,7 @@ struct SettingsView: View {
                     await stravaService.checkConnectionStatus()
                 }
             }
+            .darkSurfaceTint()
     }
 
     // MARK: - View Components
@@ -678,21 +686,23 @@ struct StravaConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
-            .tint(AppTheme.Colors.accent)
+            .adaptiveSurfaceTint()
             .navigationTitle("Strava Integration")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.LightMode.accent)
+        .darkSurfaceTint()
     }
 
     private func connectToStrava() async {
@@ -1148,21 +1158,23 @@ struct GarminConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
-            .tint(AppTheme.Colors.accent)
+            .adaptiveSurfaceTint()
             .navigationTitle("Garmin Integration")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.LightMode.accent)
+        .darkSurfaceTint()
     }
 
     private func connectToGarmin() async {
@@ -1373,7 +1385,7 @@ struct AudioCoachingRow: View {
                     }
                 ))
                 .labelsHidden()
-                .tint(AppTheme.Colors.accent)
+                .adaptiveSurfaceTint()
             }
 
             if isEnabled {

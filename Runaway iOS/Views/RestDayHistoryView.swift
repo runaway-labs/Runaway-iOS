@@ -35,6 +35,7 @@ struct RestDayHistoryView: View {
             }
             .padding()
         }
+        .adaptiveSurfaceTint()
         .navigationTitle("Rest Days")
         .navigationBarTitleDisplayMode(.large)
         .task {
@@ -50,7 +51,7 @@ struct RestDayHistoryView: View {
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     // MARK: - Recovery Status Card
@@ -357,6 +358,7 @@ struct MarkRestDaySheet: View {
                         .lineLimit(3...6)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Mark Rest Day")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -364,6 +366,7 @@ struct MarkRestDaySheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .darkSurfaceTint()
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -373,10 +376,11 @@ struct MarkRestDaySheet: View {
                         }
                     }
                     .disabled(isSaving)
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     private func saveRestDay() async {

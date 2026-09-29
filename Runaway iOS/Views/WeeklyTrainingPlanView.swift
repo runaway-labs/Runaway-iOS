@@ -442,16 +442,18 @@ struct WorkoutDetailSheet: View {
                 }
                 .padding()
             }
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     private var formattedDate: String {

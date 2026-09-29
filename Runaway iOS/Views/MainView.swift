@@ -97,7 +97,7 @@ struct MainView: View {
                     }
                 }
             }
-            .tint(AppTheme.Colors.DarkMode.accent)
+            .adaptiveSurfaceTint()
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in
@@ -208,7 +208,6 @@ struct MainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(backgroundColor)
-                .tint(AppTheme.Colors.accent)
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -335,6 +334,5 @@ private struct ProfileLoadingErrorView: View {
             }
             .padding(AppTheme.Spacing.xl)
         }
-        .tint(AppTheme.Colors.accent)
     }
 }

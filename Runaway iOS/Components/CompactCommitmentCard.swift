@@ -291,13 +291,17 @@ struct FullCommitmentSheet: View {
                 }
             )
         }
-        .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Remove", role: .destructive) {
-                deleteCommitment()
-            }
-        } message: {
-            Text("You can set a new one anytime.")
+        .background {
+            Color.clear
+                .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Remove", role: .destructive) {
+                        deleteCommitment()
+                    }
+                } message: {
+                    Text("You can set a new one anytime.")
+                }
+                .adaptiveSurfaceTint()
         }
     }
 

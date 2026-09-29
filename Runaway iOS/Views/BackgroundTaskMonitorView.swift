@@ -49,7 +49,7 @@ struct BackgroundTaskMonitorView: View {
         .sheet(isPresented: $showingDetails) {
             BackgroundTaskDetailsView()
         }
-        .tint(AppTheme.Colors.accent)
+        .adaptiveSurfaceTint()
         #if DEBUG
         .task {
             guard let athleteID = UserSession.shared.userId else { return }
@@ -421,20 +421,22 @@ struct BackgroundTaskDetailsView: View {
                 }
                 .padding()
             }
-            .tint(AppTheme.Colors.accent)
+            .adaptiveSurfaceTint()
             .navigationTitle("Background Task Details")
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.LightMode.accent)
+        .darkSurfaceTint()
     }
     
     private var backgroundAppRefreshStatus: String {

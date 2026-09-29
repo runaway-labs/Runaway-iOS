@@ -61,9 +61,11 @@ struct TodayWorkoutDecisionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .presentationDetents([.large])
         .task {
             guard model.phase == .loading else { return }

@@ -86,6 +86,7 @@ struct ActivitiesView: View {
         .onChange(of: progress.weekActivities) { _, _ in applyFilter() }
         .refreshable { await refresh() }
         .sheet(item: $selectedActivity) { activity in NavigationStack { ActivityDetailView(activity: activity) } }
+        .darkSurfaceTint()
     }
 
     private var summaryCard: some View {

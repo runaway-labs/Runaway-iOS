@@ -39,7 +39,9 @@ struct CoachActivityView: View {
                 } else { ForEach(model.history) { row($0) } }
             }.padding(AppTheme.Spacing.md)
         }
-        .background(AppTheme.Colors.adaptiveBackground).navigationTitle("Coach activity")
+        .background(AppTheme.Colors.adaptiveBackground)
+        .adaptiveSurfaceTint()
+        .navigationTitle("Coach activity")
         .task { try? model.load(athleteID: athleteID) }.refreshable { try? model.load(athleteID: athleteID) }
         .sheet(item: $selectedRecommendation) { entry in
             WorkoutDetailSheet(
@@ -48,7 +50,7 @@ struct CoachActivityView: View {
                 recommendationOnly: entry.recommendationOnly
             )
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
     private func heading(_ title: String, _ detail: String) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {

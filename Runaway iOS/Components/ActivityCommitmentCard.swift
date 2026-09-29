@@ -345,13 +345,17 @@ struct ActiveCommitmentView: View {
                 onSave: updateCommitment
             )
         }
-        .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Remove", role: .destructive) {
-                deleteCommitment()
-            }
-        } message: {
-            Text("Are you sure you want to remove today's commitment? You can set a new one afterward.")
+        .background {
+            Color.clear
+                .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Remove", role: .destructive) {
+                        deleteCommitment()
+                    }
+                } message: {
+                    Text("Are you sure you want to remove today's commitment? You can set a new one afterward.")
+                }
+                .adaptiveSurfaceTint()
         }
         .onChange(of: dataManager.todaysCommitment?.activityType) { _, newType in
             // Sync selectedActivityType when commitment changes externally
@@ -645,9 +649,11 @@ struct EditCommitmentSheet: View {
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.bottom, AppTheme.Spacing.lg)
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Edit Commitment")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -655,10 +661,12 @@ struct EditCommitmentSheet: View {
                         selectedType = currentType
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.adaptiveTextSecondary)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .task {
             await loadActivityTypes()
         }

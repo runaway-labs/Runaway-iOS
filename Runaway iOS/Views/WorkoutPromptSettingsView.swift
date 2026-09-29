@@ -79,18 +79,23 @@ struct WorkoutPromptSettingsView: View {
                 } else { ProgressView("Loading your preferences") }
                 if let error { Section { Text(error).foregroundStyle(.red); Button("Retry") { Task { await load() } } } }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Workout notifications")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .darkSurfaceTint()
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Saving..." : "Save") { Task { await save() } }
                         .disabled(draft == nil || saving || validationMessage != nil)
+                        .darkSurfaceTint()
                 }
             }
             .disabled(saving)
             .task { await load() }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     private func load() async {
@@ -155,10 +160,10 @@ struct WorkoutPromptDeliveryView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                         }
                     }.padding()
+                        .adaptiveSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
         .task {
             do {
                 guard UserSession.shared.userId == route.athleteID else { loading = false; return }

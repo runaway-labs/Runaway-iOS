@@ -57,12 +57,18 @@ struct CoachDecisionDetailView: View {
                 }
                 actionButtons(decision)
             }.padding(AppTheme.Spacing.md) } else { ProgressView().padding(.top, 80) }
-        }.background(AppTheme.Colors.adaptiveBackground).navigationTitle("Coach decision").navigationBarTitleDisplayMode(.inline)
-            .tint(AppTheme.Colors.accent)
+        }.background(AppTheme.Colors.adaptiveBackground)
+            .adaptiveSurfaceTint()
+            .navigationTitle("Coach decision").navigationBarTitleDisplayMode(.inline)
             .task { load(); await loadNarration() }
-            .alert("Couldn’t apply that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                Button("OK", role: .cancel) { }
-            } message: { Text(errorMessage ?? "Review the current plan and try again.") }
+            .background {
+                Color.clear
+                    .alert("Couldn’t apply that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+                        Button("OK", role: .cancel) { }
+                    } message: { Text(errorMessage ?? "Review the current plan and try again.") }
+                    .adaptiveSurfaceTint()
+            }
+            .darkSurfaceTint()
     }
     private func comparison(_ label: String, _ value: String, _ emphasized: Bool) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) { Text(label).font(AppTheme.Typography.caption.weight(.bold)).foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)

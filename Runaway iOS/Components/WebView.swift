@@ -219,10 +219,11 @@ struct ArticleWebView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .tint(AppTheme.Colors.accent)
+            .adaptiveSurfaceTint()
             .navigationTitle(article.source)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onDisappear {
                 cancelTimeout()
@@ -232,7 +233,8 @@ struct ArticleWebView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -241,23 +243,26 @@ struct ArticleWebView: View {
                             Image(systemName: "chevron.left")
                         }
                         .disabled(!canGoBack)
-                        .foregroundColor(AppTheme.Colors.LightMode.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
 
                         Button(action: goForward) {
                             Image(systemName: "chevron.right")
                         }
                         .disabled(!canGoForward)
-                        .foregroundColor(AppTheme.Colors.LightMode.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
 
                         Button(action: openInSafari) {
                             Image(systemName: "safari")
                         }
-                        .foregroundColor(AppTheme.Colors.LightMode.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
                     }
                 }
             }
         }
-        .tint(AppTheme.Colors.LightMode.accent)
+        .darkSurfaceTint()
     }
     
     private func goBack() {

@@ -39,17 +39,19 @@ struct AccountInformationView: View {
                     .padding(AppTheme.Spacing.lg)
                 }
             }
-            .tint(AppTheme.Colors.accent)
+            .adaptiveSurfaceTint()
             .navigationTitle("Account Information")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -58,14 +60,19 @@ struct AccountInformationView: View {
                             await saveChanges()
                         }
                     }
-                    .foregroundColor(AppTheme.Colors.LightMode.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                     .disabled(isSaving || !hasChanges)
                 }
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
+            .background {
+                Color.clear
+                    .alert("Error", isPresented: $showError) {
+                        Button("OK", role: .cancel) {}
+                    } message: {
+                        Text(errorMessage)
+                    }
+                    .adaptiveSurfaceTint()
             }
             .onAppear {
                 loadCurrentData()
@@ -76,7 +83,7 @@ struct AccountInformationView: View {
                 }
             }
         }
-        .tint(AppTheme.Colors.LightMode.accent)
+        .darkSurfaceTint()
     }
 
     // MARK: - View Components

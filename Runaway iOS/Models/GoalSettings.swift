@@ -195,6 +195,7 @@ struct GoalSettingsView: View {
                     .foregroundColor(.red)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Running Goals")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -202,6 +203,7 @@ struct GoalSettingsView: View {
                     Button("Done") {
                         saveAndDismiss()
                     }
+                    .darkSurfaceTint()
                 }
             }
             .onAppear {
@@ -211,7 +213,7 @@ struct GoalSettingsView: View {
                 loadDisplayValues()
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     /// Load values from store and convert to display units

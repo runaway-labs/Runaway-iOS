@@ -122,11 +122,12 @@ struct DebugMenuView: View {
                 }
             }
         }
+        .adaptiveSurfaceTint()
         .navigationTitle("Debug Menu")
         .sheet(isPresented: $showingBackgroundMonitor) {
             BackgroundTaskMonitorView()
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
         .onAppear {
             loadAPNsToken()
             checkNotificationStatus()

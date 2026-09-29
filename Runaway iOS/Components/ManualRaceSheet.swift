@@ -70,9 +70,11 @@ struct ManualRaceSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     private var intro: some View {

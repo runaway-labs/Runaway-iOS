@@ -54,11 +54,11 @@ struct TrainingProfileView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .disabled(model.isRegenerating)
+                        .darkSurfaceTint()
                 }
             }
             .background {
                 Color.clear
-                    .tint(AppTheme.Colors.accent)
                     .confirmationDialog(
                         "When should your plan reflect this profile?",
                         isPresented: $model.isPresentingRegenerationChoices,
@@ -94,12 +94,14 @@ struct TrainingProfileView: View {
                     } message: {
                         Text(model.errorMessage ?? "Your saved profile is safe and your previous plan is unchanged.")
                     }
+                    .adaptiveSurfaceTint()
             }
             .onChange(of: model.shouldDismiss) { _, shouldDismiss in
                 if shouldDismiss { dismiss() }
             }
             .interactiveDismissDisabled(model.isRegenerating)
         }
+        .darkSurfaceTint()
     }
 
     private var weeklyMixSummary: some View {

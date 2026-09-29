@@ -346,6 +346,16 @@ struct AppTheme {
 
 // MARK: - View Extensions
 extension View {
+    /// Lime accent for canvases and bars that are always night pine.
+    func darkSurfaceTint() -> some View {
+        tint(AppTheme.Colors.DarkMode.accent)
+    }
+
+    /// Moss in Light, lime in Dark. Use on light or adaptive content and on system alerts.
+    func adaptiveSurfaceTint() -> some View {
+        tint(AppTheme.Colors.accent)
+    }
+
     /// Standard dark card — barely raised from background, thin border (Copilot style)
     func primaryCard() -> some View {
         self

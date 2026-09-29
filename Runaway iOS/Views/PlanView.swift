@@ -118,6 +118,7 @@ struct PlanView: View {
             viewModel.currentPlan = dataManager.currentWeeklyPlan
             viewModel.displayedPlan = dataManager.currentWeeklyPlan
         }
+        .darkSurfaceTint()
     }
 
     // MARK: - Load
@@ -1091,8 +1092,14 @@ struct TrainingGuidelinesSheet: View {
             .background(AppTheme.Colors.DarkMode.background)
             .navigationTitle("Training Guidelines")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .darkSurfaceTint()
+                }
+            }
         }
+        .darkSurfaceTint()
     }
 }
 

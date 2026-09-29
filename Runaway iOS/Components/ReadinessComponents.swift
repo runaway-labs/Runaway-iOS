@@ -370,6 +370,7 @@ struct ReadinessDetailView: View {
                 }
                 .padding(.bottom, 40)
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Readiness Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -377,10 +378,11 @@ struct ReadinessDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     @MainActor
@@ -770,14 +772,16 @@ struct ReadinessCalculationSheet: View {
                 Spacer()
             }
             .padding(.top, 40)
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     private func calculateReadiness() async {

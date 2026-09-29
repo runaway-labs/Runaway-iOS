@@ -652,22 +652,28 @@ struct TodaysFocusCard: View {
                         }
                         .padding()
                     }
+                    .adaptiveSurfaceTint()
                     .navigationTitle("Today's guidance")
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { showingWorkoutDetails = false }
+                                .darkSurfaceTint()
                         }
                     }
                 }
             }
         }
-        .alert("Plan update failed", isPresented: Binding(
-            get: { adjustmentErrorMessage != nil },
-            set: { if !$0 { adjustmentErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
-        } message: {
-            Text(adjustmentErrorMessage ?? "Please try again.")
+        .background {
+            Color.clear
+                .alert("Plan update failed", isPresented: Binding(
+                    get: { adjustmentErrorMessage != nil },
+                    set: { if !$0 { adjustmentErrorMessage = nil } }
+                )) {
+                    Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
+                } message: {
+                    Text(adjustmentErrorMessage ?? "Please try again.")
+                }
+                .adaptiveSurfaceTint()
         }
     }
 
@@ -1054,9 +1060,11 @@ private struct TrainingDecisionSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .presentationDetents([.medium, .large])
         .sheet(isPresented: $showingTrainingProfile) {
             TrainingProfileView(route: TrainingProfileRoute(store: trainingProfileStore))

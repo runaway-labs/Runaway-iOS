@@ -70,6 +70,7 @@ struct TrainingView: View {
             if let id = dataManager.athlete?.id { await TrainingProgressStore.shared.refresh(athleteID: id, force: true) }
         }
         .sheet(item: $selectedActivity) { activity in NavigationStack { ActivityDetailView(activity: activity) } }
+        .darkSurfaceTint()
     }
 
     private func toLocal(_ activity: Activity) -> LocalActivity {

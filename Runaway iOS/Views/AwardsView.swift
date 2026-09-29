@@ -86,6 +86,7 @@ struct AwardsView: View {
                 .padding(.vertical, AppTheme.Spacing.md)
             }
         }
+        .adaptiveSurfaceTint()
         .navigationTitle("Awards")
         .navigationBarTitleDisplayMode(.large)
         .task {
@@ -96,7 +97,7 @@ struct AwardsView: View {
                 AwardDetailSheetFromStats(award: award)
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .darkSurfaceTint()
     }
 
     private var filteredAwards: [(award: AwardDefinition, isEarned: Bool, progress: Double)] {
@@ -482,7 +483,7 @@ struct AwardsPreviewSection: View {
                 AwardDetailSheetFromStats(award: award)
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .adaptiveSurfaceTint()
     }
 
     private func loadEarnedAwards() async {
@@ -680,20 +681,21 @@ struct AwardDetailSheet: View {
                     .padding(.top, AppTheme.Spacing.xl)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppTheme.Colors.adaptiveTextSecondary)
+                            .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                             .font(.title2)
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .tint(AppTheme.Colors.accent)
     }
 
     private func remainingText(remaining: Double) -> String {
@@ -894,20 +896,21 @@ struct AwardDetailSheetFromStats: View {
                     } // end ScrollView
                 } // end else (hasStats)
             }
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(AppTheme.Colors.adaptiveTextSecondary)
+                            .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                             .font(.title2)
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .tint(AppTheme.Colors.accent)
     }
 
     private func remainingText(remaining: Double) -> String {
