@@ -106,10 +106,10 @@ struct EmailVerificationPendingView: View {
                             Text("Open Mail App")
                                 .font(AppTheme.Typography.body.weight(.semibold))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, AppTheme.Spacing.md)
-                        .background(AppTheme.Colors.accent)
+                        .background(AppTheme.Colors.strideLime)
                         .cornerRadius(AppTheme.CornerRadius.medium)
                     }
 
@@ -258,9 +258,9 @@ private struct InstructionRow: View {
         HStack(spacing: AppTheme.Spacing.md) {
             Text("\(number)")
                 .font(AppTheme.Typography.caption.weight(.bold))
-                .foregroundColor(.white)
+                .foregroundColor(AppTheme.Colors.pine)
                 .frame(width: 24, height: 24)
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .clipShape(Circle())
 
             Text(text)

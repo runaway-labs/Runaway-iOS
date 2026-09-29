@@ -204,7 +204,7 @@ struct TacticalMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(AppTheme.Colors.accent)
+                renderer.strokeColor = UIColor(AppTheme.Colors.warmAmber)
                 renderer.lineWidth = 4
                 renderer.lineCap = .round
                 return renderer

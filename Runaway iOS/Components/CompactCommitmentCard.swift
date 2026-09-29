@@ -516,10 +516,10 @@ struct FullCommitmentSheet: View {
                             Text("Set Goal")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.black)
+                                .foregroundColor(AppTheme.Colors.pine)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, AppTheme.Spacing.sm)
-                                .background(AppTheme.Colors.accent)
+                                .background(AppTheme.Colors.strideLime)
                                 .cornerRadius(AppTheme.CornerRadius.small)
                         }
                     }

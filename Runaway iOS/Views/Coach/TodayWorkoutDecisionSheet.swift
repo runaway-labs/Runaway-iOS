@@ -111,8 +111,8 @@ struct TodayWorkoutDecisionSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.black)
-            .background(TrainingProgressStyle.amber, in: RoundedRectangle(cornerRadius: 16))
+            .foregroundStyle(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime, in: RoundedRectangle(cornerRadius: 16))
             .disabled(!model.canPreview)
 
             if model.phase != .choosing {
@@ -125,9 +125,9 @@ struct TodayWorkoutDecisionSheet: View {
         if let blocker = model.blockerMessage {
             Label(blocker, systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline)
-                .foregroundStyle(TrainingProgressStyle.amber)
+                .foregroundStyle(AppTheme.Colors.warning)
                 .padding(14)
-                .background(TrainingProgressStyle.amber.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                .background(AppTheme.Colors.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         }
     }
 
@@ -154,7 +154,9 @@ struct TodayWorkoutDecisionSheet: View {
                             }
                             Text(choice.reason).font(.caption).foregroundStyle(TrainingProgressStyle.secondary).lineLimit(2)
                             if case .blocked(let blocker) = choice.availability {
-                                Text(blocker.message).font(.caption2).foregroundStyle(TrainingProgressStyle.amber)
+                                Label(blocker.message, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(AppTheme.Colors.warning)
                             }
                         }
                         Spacer()
@@ -211,8 +213,8 @@ struct TodayWorkoutDecisionSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.black)
-            .background(TrainingProgressStyle.amber, in: RoundedRectangle(cornerRadius: 16))
+            .foregroundStyle(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime, in: RoundedRectangle(cornerRadius: 16))
             .disabled(model.phase == .committing)
             Button("Back to choices") { model.showChoices() }
                 .frame(maxWidth: .infinity, minHeight: 44)

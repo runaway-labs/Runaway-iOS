@@ -171,10 +171,10 @@ struct AnalysisPromptCard: View {
                 }
                 .font(AppTheme.Typography.body)
                 .fontWeight(.semibold)
-                .foregroundColor(.white)
+                .foregroundColor(AppTheme.Colors.pine)
                 .padding(.horizontal, AppTheme.Spacing.lg)
                 .padding(.vertical, AppTheme.Spacing.sm)
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
         }
@@ -323,7 +323,7 @@ struct EnhancedEmptyAnalysisView: View {
                 
                 Image(systemName: AppIcons.analysis)
                     .font(.system(size: 40))
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
             }
             
             VStack(spacing: AppTheme.Spacing.sm) {

@@ -79,7 +79,7 @@ struct ManualRaceSheet: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: "flag.checkered.2.crossed")
                 .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(AppTheme.Colors.strideBlueLight)
+                .foregroundStyle(AppTheme.Colors.infoBlueLight)
                 .frame(width: 48, height: 48)
                 .background(AppTheme.Colors.infoBackground, in: RoundedRectangle(cornerRadius: 14))
 
@@ -114,7 +114,7 @@ struct ManualRaceSheet: View {
                             .padding(.vertical, 12)
                             .foregroundStyle(selectedDistance == distance ? Color.white : AppTheme.Colors.textSecondary)
                             .background(
-                                selectedDistance == distance ? AppTheme.Colors.strideBlue : AppTheme.Colors.surfaceBackground,
+                                selectedDistance == distance ? AppTheme.Colors.infoBlue : AppTheme.Colors.surfaceBackground,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                     }
@@ -137,11 +137,11 @@ struct ManualRaceSheet: View {
                 displayedComponents: .date
             )
             .labelsHidden()
-            .tint(AppTheme.Colors.strideBlueLight)
+            .tint(AppTheme.Colors.infoBlueLight)
         }
         .padding(18)
         .background(AppTheme.Colors.cardBackground, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppTheme.Colors.strideBlue.opacity(0.18)))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(AppTheme.Colors.infoBlue.opacity(0.18)))
     }
 
     private var saveButton: some View {
@@ -156,7 +156,7 @@ struct ManualRaceSheet: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
             .foregroundStyle(.white)
-            .background(AppTheme.Colors.strideBlue, in: RoundedRectangle(cornerRadius: 16))
+            .background(AppTheme.Colors.infoBlue, in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .disabled(!draft.isValid || isSaving)

@@ -379,7 +379,7 @@ struct TrainingScheduleEditor: View {
                         }
                     }
                     .labelsHidden()
-                    .tint(AppTheme.Colors.warmAmber)
+                    .tint(AppTheme.Colors.adaptiveAccent)
                 }
                 .frame(minHeight: AppTheme.Layout.touchTargetMinimum)
 
@@ -402,7 +402,7 @@ struct TrainingScheduleEditor: View {
                                         .frame(minWidth: 44, minHeight: AppTheme.Layout.touchTargetMinimum)
                                         .background(
                                             unavailable
-                                                ? AppTheme.Colors.strideBlue.opacity(0.32)
+                                                ? AppTheme.Colors.infoBlue.opacity(0.32)
                                                 : AppTheme.Colors.DarkMode.surfaceBackground
                                         )
                                         .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small))
@@ -410,7 +410,7 @@ struct TrainingScheduleEditor: View {
                                             RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small)
                                                 .stroke(
                                                     unavailable
-                                                        ? AppTheme.Colors.strideBlue.opacity(0.7)
+                                                        ? AppTheme.Colors.infoBlue.opacity(0.7)
                                                         : Color.white.opacity(0.06),
                                                     lineWidth: 1
                                                 )
@@ -516,7 +516,7 @@ struct StrengthTrainingDetailsEditor: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack(spacing: AppTheme.Spacing.sm) {
                 Image(systemName: "dumbbell.fill")
-                    .foregroundColor(AppTheme.Colors.strideBlue)
+                    .foregroundColor(AppTheme.Colors.infoBlue)
                 Text("Strength setup")
                     .font(AppTheme.Typography.title3)
                     .foregroundColor(AppTheme.Colors.textPrimary)
@@ -538,7 +538,7 @@ struct StrengthTrainingDetailsEditor: View {
                     }
                 }
                 .labelsHidden()
-                .tint(AppTheme.Colors.strideBlueLight)
+                .tint(AppTheme.Colors.infoBlueLight)
             }
             .frame(minHeight: AppTheme.Layout.touchTargetMinimum)
 
@@ -558,7 +558,7 @@ struct StrengthTrainingDetailsEditor: View {
                     }
                 }
                 .labelsHidden()
-                .tint(AppTheme.Colors.strideBlueLight)
+                .tint(AppTheme.Colors.infoBlueLight)
             }
             .frame(minHeight: AppTheme.Layout.touchTargetMinimum)
         }
@@ -567,7 +567,7 @@ struct StrengthTrainingDetailsEditor: View {
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large)
-                .stroke(AppTheme.Colors.strideBlue.opacity(0.2), lineWidth: 1)
+                .stroke(AppTheme.Colors.infoBlue.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -651,7 +651,7 @@ private extension TrainingActivity {
         case .running:
             return AppTheme.Colors.warmAmber
         case .strength, .cycling, .swimming:
-            return AppTheme.Colors.strideBlue
+            return AppTheme.Colors.infoBlue
         case .walking, .hiking, .mobility:
             return AppTheme.Colors.recoveryMint
         }

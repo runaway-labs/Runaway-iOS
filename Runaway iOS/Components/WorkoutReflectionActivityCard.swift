@@ -59,10 +59,10 @@ struct WorkoutReflectionActivityCard: View {
                         Image(systemName: "arrow.up.right")
                     }
                     .font(AppTheme.Typography.subheadlineBold)
-                    .foregroundStyle(Color(red: 0.10, green: 0.05, blue: 0))
+                    .foregroundStyle(AppTheme.Colors.pine)
                     .padding(.horizontal, AppTheme.Spacing.lg)
                     .frame(maxWidth: .infinity, minHeight: 48)
-                    .background(AppTheme.Colors.warmAmber)
+                    .background(AppTheme.Colors.strideLime)
                     .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
                 }
                 .buttonStyle(.plain)

@@ -176,7 +176,7 @@ struct TodaysFocusCard: View {
         case .runningPrimary:
             return AppTheme.Colors.warmAmber
         case .aerobic:
-            return AppTheme.Colors.strideBlue
+            return AppTheme.Colors.infoBlue
         case .recovery:
             return AppTheme.Colors.recoveryMint
         case .workout(let workoutType):
@@ -530,8 +530,8 @@ struct TodaysFocusCard: View {
                             .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.black)
-                    .background(TrainingProgressStyle.amber, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(AppTheme.Colors.pine)
+                    .background(AppTheme.Colors.strideLime, in: RoundedRectangle(cornerRadius: 14))
                     .accessibilityIdentifier("performanceCoachPrimaryAction")
 
                     Button { presentDailyDecision(showChoices: true) } label: {
@@ -1080,8 +1080,8 @@ private struct TrainingDecisionSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
-            .foregroundColor(.white)
-            .background(AppTheme.Colors.warmAmber)
+            .foregroundColor(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime)
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         }
         .padding(14)

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Token preview, not a simulator screenshot</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    background: #F4F1E8;
+    color: #202E28;
+    font-family: "Avenir Next", "Segoe UI", sans-serif;
+    padding: 28px 32px 36px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: 0.01em; }
+  .banner {
+    display: inline-block;
+    margin: 8px 0 18px;
+    padding: 6px 10px;
+    border: 1px solid #202E28;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  p.lead { margin: 0 0 18px; max-width: 820px; font-size: 14px; line-height: 1.45; }
+  h2 { font-size: 15px; margin: 22px 0 10px; }
+  table { border-collapse: collapse; width: 100%; background: white; }
+  th, td { border: 1px solid #D5DDD6; padding: 8px 10px; text-align: left; font-size: 13px; vertical-align: middle; }
+  th { background: #E7EDE6; font-weight: 700; }
+  .swatch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 148px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .note { font-size: 12px; color: #3E4A43; }
+  .fail { color: #8C1D1D; font-weight: 700; }
+  .pass { color: #1E4D32; font-weight: 700; }
+</style>
+</head>
+<body>
+  <h1>Token preview, not a simulator screenshot</h1>
+  <div class="banner">Token preview, not a simulator screenshot</div>
+  <p class="lead">Static swatches for the Runaway shared palette (runaway-trails tokens v0.2). This is not an iOS simulator capture. Contrast ratios are WCAG relative luminance.</p>
+
+  <h2>Before and after</h2>
+  <table>
+    <thead>
+      <tr><th>Token</th><th>Before</th><th>After</th><th>Contrast</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>background<br><span class="note">canvas, with primary text</span></td>
+        <td><span class="swatch" style="background:#0A1019;color:#FFFFFF">#0A1019</span></td>
+        <td><span class="swatch" style="background:#0C1210;color:#F3F5EF">#0C1210</span></td>
+        <td>White on navy 19.07:1<br>Chalk on night pine <span class="pass">17.23:1</span></td>
+      </tr>
+      <tr>
+        <td>backgroundElevated<br><span class="note">also tab bar</span></td>
+        <td><span class="swatch" style="background:#0E1723;color:#FFFFFF">#0E1723</span></td>
+        <td><span class="swatch" style="background:#101815;color:#F3F5EF">#101815</span></td>
+        <td>Chalk on elevated <span class="pass">16.43:1</span></td>
+      </tr>
+      <tr>
+        <td>Primary button<br><span class="note">only action fill</span></td>
+        <td><span class="swatch" style="background:#F59E0B;color:#000000">Run</span></td>
+        <td><span class="swatch" style="background:#D6F35A;color:#202E28">Run</span></td>
+        <td>Black on amber 9.78:1<br>Pine on lime <span class="pass">11.35:1</span><br><span class="fail">White on lime 1.25:1, not allowed</span></td>
+      </tr>
+      <tr>
+        <td>Amber identity<br><span class="note">brand, run track. Not a button.</span></td>
+        <td><span class="swatch" style="background:#0A1019;color:#F59E0B">#F59E0B</span></td>
+        <td><span class="swatch" style="background:#0C1210;color:#F59E0B">#F59E0B</span></td>
+        <td>Amber on night pine <span class="pass">8.81:1</span></td>
+      </tr>
+      <tr>
+        <td>Light-mode accent<br><span class="note">text and tint, not a lime label</span></td>
+        <td><span class="swatch" style="background:#F2F2F5;color:#F59E0B">#F59E0B</span></td>
+        <td><span class="swatch" style="background:#FAFBF6;color:#496550">#496550</span></td>
+        <td><span class="fail">Lime on chalk 1.20:1, not for text</span><br>Moss on chalk <span class="pass">6.19:1</span><br>Moss on current light canvas 5.76:1</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Other checked pairs</h2>
+  <table>
+    <thead><tr><th>Pair</th><th>Ratio</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td>Secondary #9AA59E on night pine</td><td class="pass">7.43:1</td><td>Secondary text on the canvas</td></tr>
+      <tr><td>Tertiary #8E9992 on surfaceElevated #283931</td><td>4.14:1</td><td>Keep tertiary text off surfaceElevated</td></tr>
+      <tr><td>Tertiary #8E9992 on night pine</td><td class="pass">6.42:1</td><td>Tertiary text on the canvas</td></tr>
+      <tr><td>Warning #E2B714 on night pine</td><td class="pass">9.93:1</td><td>Severity, with an icon and a label</td></tr>
+      <tr><td>Lime #D6F35A on night pine</td><td class="pass">15.16:1</td><td>Accent text on the dark canvas</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

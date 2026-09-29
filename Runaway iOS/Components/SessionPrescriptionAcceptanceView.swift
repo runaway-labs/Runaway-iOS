@@ -9,7 +9,12 @@ struct SessionPrescriptionAcceptanceButton: View {
 
     var body: some View {
         Button("Choose day and review week") { presented = true }
-            .buttonStyle(.borderedProminent).tint(.blue)
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.Colors.pine)
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            .padding(.vertical, AppTheme.Spacing.sm)
+            .background(AppTheme.Colors.strideLime)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
             .sheet(isPresented: $presented) {
                 SessionPrescriptionAcceptanceView(snapshot: snapshot, goal: goal, proposal: proposal, athleteID: athleteID)
             }

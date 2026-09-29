@@ -159,7 +159,12 @@ struct ArticleWebView: View {
                             Button("Retry") {
                                 retryLoading()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(AppTheme.Colors.pine)
+                            .padding(.horizontal, AppTheme.Spacing.md)
+                            .padding(.vertical, AppTheme.Spacing.sm)
+                            .background(AppTheme.Colors.strideLime)
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                             
                             Button("Open in Safari") {
                                 openInSafari()

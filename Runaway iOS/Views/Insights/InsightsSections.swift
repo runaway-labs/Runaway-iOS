@@ -147,9 +147,9 @@ struct UnifiedRecommendationsBanner: View {
                     Text("\(index + 1)")
                         .font(AppTheme.Typography.caption)
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .frame(width: 20, height: 20)
-                        .background(AppTheme.Colors.accent)
+                        .background(AppTheme.Colors.strideLime)
                         .clipShape(Circle())
 
                     Text(recommendation)
@@ -536,10 +536,10 @@ struct WeeklyPlanSection: View {
                         }
                         .font(AppTheme.Typography.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(AppTheme.Colors.accent)
+                        .background(AppTheme.Colors.strideLime)
                         .cornerRadius(AppTheme.CornerRadius.medium)
                     }
                     .disabled(isGenerating)

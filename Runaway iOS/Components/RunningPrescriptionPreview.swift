@@ -12,7 +12,7 @@ struct RunningPrescriptionPreview: View {
         let blocks = run.blocks(includingWalkBreak: includeWalkBreak)
         VStack(alignment: .leading, spacing: 16) {
             Label("Easy running preview", systemImage: "figure.run")
-                .foregroundStyle(AppTheme.Colors.strideBlue)
+                .foregroundStyle(AppTheme.Colors.infoBlue)
             Text("\(duration(run.totalSeconds)) total").font(.title3.bold())
             Text(goalPurpose).font(.subheadline).foregroundStyle(.secondary)
 
@@ -30,7 +30,7 @@ struct RunningPrescriptionPreview: View {
                     Text("\(index + 1)")
                         .font(.caption.bold()).monospacedDigit()
                         .frame(width: 26, height: 26)
-                        .background(AppTheme.Colors.strideBlue.opacity(0.12), in: Circle())
+                        .background(AppTheme.Colors.infoBlue.opacity(0.12), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 5) {
                         ViewThatFits(in: .horizontal) {

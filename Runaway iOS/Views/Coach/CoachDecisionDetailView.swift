@@ -50,7 +50,10 @@ struct CoachDecisionDetailView: View {
                     Text(decision.reasonCodes.map(\.rawValue).joined(separator: " · ").capitalized)
                         .foregroundStyle(AppTheme.Colors.adaptiveTextSecondary)
                     Text("Evidence confidence \(Int(decision.confidence * 100))%").font(AppTheme.Typography.caption.weight(.semibold))
-                    if !decision.missingData.isEmpty { Text("Missing: " + decision.missingData.joined(separator: ", ")).foregroundStyle(AppTheme.Colors.warning) }
+                    if !decision.missingData.isEmpty {
+                        Label("Missing: " + decision.missingData.joined(separator: ", "), systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(AppTheme.Colors.warning)
+                    }
                 }
                 actionButtons(decision)
             }.padding(AppTheme.Spacing.md) } else { ProgressView().padding(.top, 80) }
@@ -67,7 +70,12 @@ struct CoachDecisionDetailView: View {
     @ViewBuilder private func actionButtons(_ decision: CoachDecision) -> some View {
         if let model { let actions = model.availableActions(for: decision)
             if actions.contains(.accept) {
-                Button("Accept updated week") { perform { try model.accept(decision.id) } }.buttonStyle(.borderedProminent).tint(AppTheme.Colors.warmAmber)
+                Button("Accept updated week") { perform { try model.accept(decision.id) } }
+                    .buttonStyle(.plain)
+                    .font(AppTheme.Typography.bodyBold)
+                    .foregroundStyle(AppTheme.Colors.pine)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(AppTheme.Colors.strideLime, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
                 Button("Keep my original week") { perform { try model.keepOriginal(decision.id) } }.buttonStyle(.bordered)
             } else if actions.contains(.undo) { Button("Undo this change") { perform { _ = try model.undo(decision.id) } }.buttonStyle(.bordered) }
         }

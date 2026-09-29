@@ -1,8 +1,8 @@
 import SwiftUI
 
 // MARK: - App Theme
-// Copilot-dark aesthetic with Runaway amber accent
-// Near-black backgrounds, tight card borders, aggressive type hierarchy
+// Night pine canvas with stride lime actions. Amber is identity only.
+// Tight card borders, aggressive type hierarchy. UI fonts stay as they are.
 
 struct AppTheme {
 
@@ -10,23 +10,21 @@ struct AppTheme {
     struct Colors {
 
         // MARK: - Brand Accent
-        // Warm Amber — Runaway's primary brand color
-        static let warmAmber    = Color(red: 0.961, green: 0.620, blue: 0.043) // #F59E0B
+        // Amber is identity only: the brand mark, run activity color, and the user's own map track.
+        static let warmAmber    = RunawayPalette.amber // #F59E0B
         static let amberLight   = Color(red: 0.984, green: 0.749, blue: 0.298) // #FBBF4C
         static let amberDark    = Color(red: 0.780, green: 0.475, blue: 0.012) // #C77903
 
-        // Cool performance colors keep amber focused on running and primary actions.
-        static let strideBlue      = Color(red: 0.220, green: 0.580, blue: 0.980) // #3894FA
-        static let strideBlueLight = Color(red: 0.400, green: 0.720, blue: 1.000) // #66B8FF
-        static let recoveryMint    = Color(red: 0.180, green: 0.760, blue: 0.650) // #2EC2A6
+        // Stride lime is the only action fill. Text and icons on that fill use pine.
+        static let strideLime        = RunawayPalette.strideLime // #D6F35A
+        static let strideLimePressed = RunawayPalette.strideLimePressed // #C8E94A
+        static let pine              = RunawayPalette.pine // #202E28
+        static let moss              = RunawayPalette.moss // #496550
 
-        // Legacy alias — keep existing code working
-        static let royalBlue     = warmAmber
-        static let royalBlueLight = amberLight
-        static let royalBlueDark  = amberDark
-        static let deepOrange     = warmAmber
-        static let deepOrangeLight = amberLight
-        static let deepOrangeDark  = amberDark
+        // Informational blue. Not the lime "stride" and not an action fill.
+        static let infoBlue      = RunawayPalette.infoBlue // #3894FA
+        static let infoBlueLight = RunawayPalette.infoBlueLight // #66B8FF
+        static let recoveryMint  = Color(red: 0.180, green: 0.760, blue: 0.650) // #2EC2A6
 
         // Secondary palette
         static let deepPurple      = Color(red: 0.416, green: 0.106, blue: 0.604) // #6A1B9A
@@ -39,16 +37,16 @@ struct AppTheme {
         static let tealLight = Color(red: 0.15, green: 0.60, blue: 0.55)
         static let tealDark  = Color(red: 0.0, green: 0.35, blue: 0.30)
         static let swimBlue  = Color(red: 0.251, green: 0.651, blue: 0.902) // #40A6E6
-        static let darkNavy  = Color(red: 0.05, green: 0.06, blue: 0.09)
 
-        // MARK: - Accent (theme-aware)
+        // MARK: - Accent
+        // Dark-canvas action accent. Light-mode text and tint use moss via LightMode.accent
+        // and adaptiveAccent, because lime on chalk is about 1.2:1.
         private static var isDarkModeFromDefaults: Bool {
             UserDefaults.standard.string(forKey: "app_theme_mode") != "light"
         }
-        static var accent: Color      { warmAmber }
-        static var accentLight: Color { amberLight }
-        static let accentDark = amberDark
-        static let blue = warmAmber
+        static let accent = strideLime
+        static var accentLight: Color { strideLimePressed }
+        static let accentDark = strideLimePressed
 
         // Primary text
         static let primary      = Color.white
@@ -57,22 +55,20 @@ struct AppTheme {
         static let purple = deepPurple
         static let purpleLight = deepPurpleLight
         static let purpleDark = deepPurpleDark
-        static let orange = warmAmber
-        static let orangeLight = amberLight
-        static let orangeDark = amberDark
 
         // MARK: - Global dark backgrounds (shared between modes when forced dark)
-        static let background           = Color(red: 0.039, green: 0.063, blue: 0.098) // #0A1019
-        static let backgroundElevated   = Color(red: 0.055, green: 0.090, blue: 0.137) // #0E1723
-        static let cardBackground       = Color(red: 0.071, green: 0.110, blue: 0.157) // #121C28
-        static let cardBackgroundElevated = Color(red: 0.090, green: 0.141, blue: 0.204) // #172434
-        static let surfaceBackground    = Color(red: 0.110, green: 0.169, blue: 0.239) // #1C2B3D
-        static let surfaceElevated      = Color(red: 0.137, green: 0.204, blue: 0.286) // #233449
+        static let background           = RunawayPalette.nightPine // #0C1210
+        static let backgroundElevated   = RunawayPalette.backgroundElevated // #101815
+        static let cardBackground       = RunawayPalette.cardBackground // #131B18
+        static let cardBackgroundElevated = RunawayPalette.cardBackgroundElevated // #1A2420
+        static let surfaceBackground    = RunawayPalette.surfaceBackground // #223029
+        static let surfaceElevated      = RunawayPalette.surfaceElevated // #283931
 
-        // Text (dark bg)
-        static let textPrimary    = Color.white
-        static let textSecondary  = Color(red: 0.533, green: 0.569, blue: 0.620) // #88919E
-        static let textTertiary   = Color(red: 0.380, green: 0.408, blue: 0.451) // #616873
+        // Text (dark bg). Tertiary is about 4.1:1 on surfaceElevated, so keep it off that surface.
+        // textQuaternary is for disabled or decorative marks only.
+        static let textPrimary    = RunawayPalette.textPrimary // #F3F5EF
+        static let textSecondary  = RunawayPalette.textSecondary // #9AA59E
+        static let textTertiary   = RunawayPalette.textTertiary // #8E9992
         static let textQuaternary = Color(red: 0.267, green: 0.286, blue: 0.318) // #444951
         static let textOnLight    = Color(red: 0.08, green: 0.08, blue: 0.10)
         static let textSecondaryOnLight = Color(red: 0.35, green: 0.35, blue: 0.42)
@@ -80,25 +76,25 @@ struct AppTheme {
         // MARK: - Status
         static let success           = forestGreenLight
         static let successBackground = forestGreen.opacity(0.20)
-        static let warning           = warmAmber
-        static let warningBackground = warmAmber.opacity(0.15)
+        static let warning           = RunawayPalette.warning // #E2B714
+        static let warningBackground = warning.opacity(0.15)
         static let error             = Color(red: 1.0, green: 0.38, blue: 0.38)
         static let errorBackground   = Color(red: 1.0, green: 0.38, blue: 0.38).opacity(0.15)
-        static let info              = strideBlueLight
-        static let infoBackground    = strideBlue.opacity(0.14)
+        static let info              = infoBlueLight
+        static let infoBackground    = infoBlue.opacity(0.14)
 
         // MARK: - Icon colors
         static let iconPrimary  = Color.white
         static let iconSecondary = Color(red: 0.60, green: 0.63, blue: 0.68)
-        static let iconAccent   = warmAmber
+        static let iconAccent   = strideLime
         static let iconSuccess  = forestGreenLight
-        static let iconWarning  = warmAmber
+        static let iconWarning  = warning
         static let iconError    = error
         static let iconMuted    = Color(red: 0.44, green: 0.47, blue: 0.51)
 
         // MARK: - Gradients
         static let accentGradient = LinearGradient(
-            colors: [warmAmber, amberDark],
+            colors: [strideLime, strideLimePressed],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let purpleBlueGradient = LinearGradient(
@@ -113,16 +109,12 @@ struct AppTheme {
             colors: [cardBackground, background],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
-        static let orangeGradient = LinearGradient(
-            colors: [warmAmber, amberDark],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
         static let successGradient = LinearGradient(
             colors: [forestGreenLight, forestGreen],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let warningGradient = LinearGradient(
-            colors: [warmAmber, amberDark],
+            colors: [warning, warning.opacity(0.75)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let errorGradient = LinearGradient(
@@ -130,11 +122,7 @@ struct AppTheme {
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let backgroundGradient = LinearGradient(
-            colors: [background, Color(red: 0.020, green: 0.025, blue: 0.035)],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-        static let navyGradient = LinearGradient(
-            colors: [darkNavy, Color(red: 0.040, green: 0.049, blue: 0.063)],
+            colors: [backgroundElevated, background],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
 
@@ -153,16 +141,16 @@ struct AppTheme {
 
         // MARK: - Semantic
         struct Semantic {
-            static let link = strideBlueLight
-            static let linkVisited = strideBlue
-            static let interactive = warmAmber
-            static let interactiveHover = amberLight
-            static let interactivePressed = amberDark
+            static let link = infoBlueLight
+            static let linkVisited = infoBlue
+            static let interactive = strideLime
+            static let interactiveHover = strideLimePressed
+            static let interactivePressed = strideLimePressed
             static let progressTrack = Color.white.opacity(0.10)
-            static let progressFill = warmAmber
+            static let progressFill = strideLime
             static let divider = Color.white.opacity(0.07)
             static let border = Color.white.opacity(0.08)
-            static let borderFocused = warmAmber
+            static let borderFocused = strideLime
             static let overlayLight = Color.white.opacity(0.05)
             static let overlayMedium = Color.white.opacity(0.10)
             static let overlayDark = Color.black.opacity(0.55)
@@ -180,32 +168,33 @@ struct AppTheme {
             static let textSecondary      = Color(red: 0.32, green: 0.32, blue: 0.38)
             static let textTertiary       = Color(red: 0.48, green: 0.48, blue: 0.54)
             static let textQuaternary     = Color(red: 0.62, green: 0.62, blue: 0.68)
-            static let accent             = warmAmber
-            static let accentBright       = amberLight
+            // Accent text and tint. Lime is a fill only in light mode.
+            static let accent             = moss
+            static let accentBright       = pine
         }
 
-        // MARK: - Dark Mode (Copilot-dark + Runaway amber)
+        // MARK: - Dark Mode (night pine + stride lime)
         struct DarkMode {
-            // True near-black — deeper than before
-            static let background         = Color(red: 0.039, green: 0.063, blue: 0.098)
-            static let backgroundElevated = Color(red: 0.055, green: 0.090, blue: 0.137)
-            static let cardBackground     = Color(red: 0.071, green: 0.110, blue: 0.157)
-            static let cardBackgroundElevated = Color(red: 0.090, green: 0.141, blue: 0.204)
-            static let surfaceBackground  = Color(red: 0.110, green: 0.169, blue: 0.239)
-            static let surfaceElevated    = Color(red: 0.137, green: 0.204, blue: 0.286)
+            static let background         = RunawayPalette.nightPine // #0C1210
+            static let backgroundElevated = RunawayPalette.backgroundElevated // #101815
+            static let cardBackground     = RunawayPalette.cardBackground // #131B18
+            static let cardBackgroundElevated = RunawayPalette.cardBackgroundElevated // #1A2420
+            static let surfaceBackground  = RunawayPalette.surfaceBackground // #223029
+            static let surfaceElevated    = RunawayPalette.surfaceElevated // #283931
 
-            // Text
-            static let textPrimary    = Color.white
-            static let textSecondary  = Color(red: 0.533, green: 0.569, blue: 0.620) // #88919E
-            static let textTertiary   = Color(red: 0.380, green: 0.408, blue: 0.451) // #616873
+            // Text. Tertiary is about 4.1:1 on surfaceElevated, so keep it off that surface.
+            // textQuaternary is for disabled or decorative marks only.
+            static let textPrimary    = RunawayPalette.textPrimary // #F3F5EF
+            static let textSecondary  = RunawayPalette.textSecondary // #9AA59E
+            static let textTertiary   = RunawayPalette.textTertiary // #8E9992
             static let textQuaternary = Color(red: 0.267, green: 0.286, blue: 0.318) // #444951
 
             // Accent
-            static let accent      = warmAmber
-            static let accentBright = amberLight
+            static let accent      = strideLime
+            static let accentBright = strideLimePressed
 
-            // Tab bar
-            static let tabBarBackground = Color(red: 0.055, green: 0.090, blue: 0.137)
+            // Tab bar matches backgroundElevated.
+            static let tabBarBackground = backgroundElevated
         }
     }
 
@@ -362,16 +351,13 @@ extension View {
             )
     }
 
-    /// Amber accent card — for hero moments / race day / key calls to action
+    /// Action card. Lime fill with pine text and icons. No amber glow.
     func accentCard() -> some View {
         self
             .padding(AppTheme.Spacing.lg)
-            .background(AppTheme.Colors.warmAmber)
+            .foregroundColor(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime)
             .cornerRadius(AppTheme.CornerRadius.large)
-            .shadow(
-                color: AppTheme.Colors.warmAmber.opacity(0.35),
-                radius: 12, x: 0, y: 4
-            )
     }
 
     /// Surface card — theme-aware, for nested content
@@ -418,16 +404,16 @@ extension View {
             .cornerRadius(AppTheme.CornerRadius.large)
     }
 
-    /// Glass card with amber glow
+    /// Glass card with a lime edge for calls to action.
     func glassCardAccent() -> some View {
         self
             .padding(AppTheme.Spacing.lg)
             .background(.ultraThinMaterial)
-            .background(AppTheme.Colors.warmAmber.opacity(0.12))
+            .background(AppTheme.Colors.strideLime.opacity(0.12))
             .cornerRadius(AppTheme.CornerRadius.large)
             .overlay(
                 RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large)
-                    .stroke(AppTheme.Colors.warmAmber.opacity(0.25), lineWidth: 1)
+                    .stroke(AppTheme.Colors.strideLime.opacity(0.25), lineWidth: 1)
             )
     }
 
@@ -448,12 +434,11 @@ extension View {
     func primaryButton() -> some View {
         self
             .font(AppTheme.Typography.bodyBold)
-            .foregroundColor(.black)
+            .foregroundColor(AppTheme.Colors.pine)
             .padding(.horizontal, AppTheme.Spacing.xl)
             .padding(.vertical, AppTheme.Spacing.md)
-            .background(AppTheme.Colors.warmAmber)
+            .background(AppTheme.Colors.strideLime)
             .cornerRadius(AppTheme.CornerRadius.large)
-            .shadow(color: AppTheme.Colors.warmAmber.opacity(0.35), radius: 10, x: 0, y: 4)
     }
 
     func secondaryButton() -> some View {
@@ -473,7 +458,7 @@ extension View {
     func tertiaryButton() -> some View {
         self
             .font(AppTheme.Typography.bodyBold)
-            .foregroundColor(AppTheme.Colors.warmAmber)
+            .foregroundColor(AppTheme.Colors.adaptiveAccent)
             .padding(.horizontal, AppTheme.Spacing.lg)
             .padding(.vertical, AppTheme.Spacing.sm)
     }
@@ -585,6 +570,15 @@ extension AppTheme.Colors {
             trait.userInterfaceStyle == .dark
                 ? UIColor(AppTheme.Colors.DarkMode.textTertiary)
                 : UIColor(AppTheme.Colors.LightMode.textTertiary)
+        })
+    }
+
+    /// Lime on a dark canvas, moss on a light canvas. Use for accent text and tint, not for button fills.
+    static var adaptiveAccent: Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(AppTheme.Colors.DarkMode.accent)
+                : UIColor(AppTheme.Colors.LightMode.accent)
         })
     }
 }

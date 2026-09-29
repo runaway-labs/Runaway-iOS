@@ -15,7 +15,7 @@ struct TrainingAdaptationReview: View {
                         results: snapshot.sessionResults, on: snapshot.generatedAt)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(goal.title).font(.subheadline.bold())
-                        Text(assessment.state.title).foregroundStyle(AppTheme.Colors.strideBlue)
+                        Text(assessment.state.title).foregroundStyle(AppTheme.Colors.infoBlue)
                         Text(assessment.reason).font(.caption).foregroundStyle(.secondary)
                     }
                 }

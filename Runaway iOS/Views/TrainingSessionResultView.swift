@@ -126,7 +126,7 @@ struct TrainingSessionResultView: View {
             }
             .navigationTitle(existingResult == nil ? "Record completed work" : "Edit completed work")
             .navigationBarTitleDisplayMode(.inline)
-            .tint(AppTheme.Colors.strideBlue)
+            .tint(AppTheme.Colors.infoBlue)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
             .onReceive(NotificationCenter.default.publisher(for: .trainingSessionInvalidated)) { _ in dismiss() }
             .alert(saved ? "Session saved" : "Could not save", isPresented: Binding(

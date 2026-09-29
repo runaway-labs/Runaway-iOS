@@ -87,7 +87,10 @@ struct BackgroundTaskMonitorView: View {
             if let state = athleteStateService.snapshot {
                 comparisonRow("State", "\(state.recoveryDirection.rawValue) · \(state.intensityCap.rawValue)")
                 comparisonRow("Missing", state.missingSignals.isEmpty ? "None" : state.missingSignals.joined(separator: ", "))
-                Text(state.isStale() ? "State is stale; last-known-good remains visible." : "State is current.")
+                Label(
+                    state.isStale() ? "State is stale; last-known-good remains visible." : "State is current.",
+                    systemImage: state.isStale() ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+                )
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(state.isStale() ? AppTheme.Colors.warning : AppTheme.Colors.success)
             }
@@ -227,8 +230,8 @@ struct BackgroundTaskMonitorView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(AppTheme.Colors.accent)
-                .foregroundColor(.black)
+                .background(AppTheme.Colors.strideLime)
+                .foregroundColor(AppTheme.Colors.pine)
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
 

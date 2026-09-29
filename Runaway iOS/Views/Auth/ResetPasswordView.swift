@@ -135,7 +135,7 @@ struct ResetPasswordView: View {
                             Group {
                                 if isLoading {
                                     ProgressView()
-                                        .tint(.black)
+                                        .tint(AppTheme.Colors.pine)
                                 } else {
                                     Text("Update Password")
                                         .fontWeight(.semibold)
@@ -145,8 +145,8 @@ struct ResetPasswordView: View {
                             .frame(height: 52)
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(.black)
-                        .background(AppTheme.Colors.primary)
+                        .foregroundStyle(AppTheme.Colors.pine)
+                        .background(AppTheme.Colors.strideLime)
                         .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                         .disabled(isLoading || validationMessage != nil)
                         .opacity(validationMessage == nil ? 1 : 0.55)

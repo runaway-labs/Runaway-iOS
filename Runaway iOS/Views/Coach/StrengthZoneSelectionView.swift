@@ -38,9 +38,9 @@ struct StrengthZoneSelectionView: View {
                     .foregroundStyle(TrainingProgressStyle.secondary)
             }
             if let errorMessage {
-                Text(errorMessage)
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(TrainingProgressStyle.amber)
+                    .foregroundStyle(AppTheme.Colors.warning)
             }
 
             Button { onBuild(duration) } label: {
@@ -49,9 +49,9 @@ struct StrengthZoneSelectionView: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.black)
+            .foregroundStyle(AppTheme.Colors.pine)
             .background(
-                (selection.isEmpty ? TrainingProgressStyle.secondary : TrainingProgressStyle.amber),
+                (selection.isEmpty ? TrainingProgressStyle.secondary : AppTheme.Colors.strideLime),
                 in: RoundedRectangle(cornerRadius: 16)
             )
             .disabled(selection.isEmpty)
@@ -105,7 +105,7 @@ private struct StrengthZoneTile: View {
                     .frame(width: 44, height: 44)
                 Spacer()
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(AppTheme.Colors.pine)
                     .opacity(selected ? 1 : 0)
             }
             Text(recommendation.zone.rawValue.capitalized).font(.headline)
@@ -119,11 +119,11 @@ private struct StrengthZoneTile: View {
         }
         .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
         .padding(14)
-        .foregroundStyle(selected ? Color.black : Color.white)
+        .foregroundStyle(selected ? AppTheme.Colors.pine : Color.white)
         .background {
             if selected {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(TrainingProgressStyle.amber)
+                    .fill(AppTheme.Colors.strideLime)
             } else {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(TrainingProgressStyle.surface)

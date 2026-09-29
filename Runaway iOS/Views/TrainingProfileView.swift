@@ -122,7 +122,7 @@ struct TrainingProfileView: View {
     private var validationRepairCard: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
             Image(systemName: "wand.and.stars")
-                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                .foregroundColor(AppTheme.Colors.infoBlueLight)
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                 Text("We’ll tidy this before saving")
@@ -136,11 +136,11 @@ struct TrainingProfileView: View {
         }
         .padding(AppTheme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.Colors.strideBlue.opacity(0.1))
+        .background(AppTheme.Colors.infoBlue.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium)
-                .stroke(AppTheme.Colors.strideBlue.opacity(0.24), lineWidth: 1)
+                .stroke(AppTheme.Colors.infoBlue.opacity(0.24), lineWidth: 1)
         )
     }
 
@@ -166,7 +166,7 @@ struct TrainingProfileView: View {
         VStack(spacing: AppTheme.Spacing.lg) {
             ProgressView()
                 .controlSize(.large)
-                .tint(AppTheme.Colors.warmAmber)
+                .tint(AppTheme.Colors.strideLime)
             Text("Updating your plan")
                 .font(AppTheme.Typography.title3)
                 .foregroundColor(AppTheme.Colors.textPrimary)

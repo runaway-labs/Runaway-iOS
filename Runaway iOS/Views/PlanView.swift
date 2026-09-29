@@ -441,7 +441,7 @@ struct NextRaceCard: View {
                                 Text("Scout Course")
                             }
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.black)
+                            .foregroundColor(AppTheme.Colors.pine)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(urgencyColor)
@@ -490,7 +490,7 @@ struct NextRaceCard: View {
             if let raceWeather {
                 HStack(spacing: 8) {
                     Image(systemName: raceWeather.symbolName)
-                        .foregroundColor(AppTheme.Colors.strideBlueLight)
+                        .foregroundColor(AppTheme.Colors.infoBlueLight)
                     Text("Race-day outlook")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
@@ -549,9 +549,10 @@ struct NoRaceCard: View {
                     .font(AppTheme.Typography.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.Colors.strideBlue)
-            .foregroundStyle(Color.white)
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
             .padding(.top, 4)
         }
         .padding(24)
@@ -997,10 +998,10 @@ struct NoPlanView: View {
                     Text(isGenerating ? "Generating..." : "Generate Plan")
                 }
                 .font(AppTheme.Typography.headline)
-                .foregroundColor(.black)
+                .foregroundColor(AppTheme.Colors.pine)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
             .disabled(isGenerating)

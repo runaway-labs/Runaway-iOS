@@ -97,7 +97,7 @@ struct MainView: View {
                     }
                 }
             }
-            .tint(AppTheme.Colors.warmAmber)
+            .tint(AppTheme.Colors.adaptiveAccent)
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in
@@ -324,10 +324,10 @@ private struct ProfileLoadingErrorView: View {
                         }
                         Text(isRetrying ? "Loading..." : "Try Again")
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
                     .padding(.horizontal, AppTheme.Spacing.xl)
                     .padding(.vertical, AppTheme.Spacing.md)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.medium)
                 }
                 .disabled(isRetrying)

@@ -145,7 +145,13 @@ struct WorkoutPromptDeliveryView: View {
                                 .font(.title2.bold())
                             Text(error ?? "This notification may be from an earlier day, or your training has changed. Open Today for a current recommendation.")
                                 .foregroundStyle(.secondary).multilineTextAlignment(.center)
-                            Button("Open Today", action: openToday).buttonStyle(.borderedProminent)
+                            Button("Open Today", action: openToday)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(AppTheme.Colors.pine)
+                                .padding(.horizontal, AppTheme.Spacing.lg)
+                                .padding(.vertical, AppTheme.Spacing.sm)
+                                .background(AppTheme.Colors.strideLime)
+                                .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                         }
                     }.padding()
                 }

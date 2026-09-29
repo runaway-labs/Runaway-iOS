@@ -660,7 +660,7 @@ struct StravaConnectSheet: View {
                         HStack {
                             if isLoading {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(AppTheme.Colors.pine)
                             } else {
                                 Image(systemName: "bolt.fill")
                                 Text("Connect with Strava")
@@ -668,8 +668,8 @@ struct StravaConnectSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange)
-                        .foregroundColor(.white)
+                        .background(AppTheme.Colors.strideLime)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .cornerRadius(AppTheme.Spacing.md)
                     }
                     .disabled(isLoading)

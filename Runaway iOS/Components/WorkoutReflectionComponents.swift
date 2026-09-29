@@ -94,7 +94,7 @@ struct WorkoutReflectionSheet: View {
             }
 
             Slider(value: $viewModel.effort, in: 1...10, step: 1)
-                .tint(AppTheme.Colors.warmAmber)
+                .tint(AppTheme.Colors.strideLime)
                 .accessibilityLabel("Effort")
                 .accessibilityValue("\(Int(viewModel.effort.rounded())) out of 10")
 

@@ -9,7 +9,7 @@ struct StrengthZoneIcon: View {
             .resizable()
             .renderingMode(.template)
             .scaledToFit()
-            .foregroundStyle(selected ? Color.black : TrainingProgressStyle.amber)
+            .foregroundStyle(selected ? AppTheme.Colors.pine : TrainingProgressStyle.amber)
             .accessibilityHidden(true)
     }
 

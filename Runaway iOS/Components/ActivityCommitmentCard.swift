@@ -169,11 +169,11 @@ struct NoCommitmentView: View {
                     Text("Set Commitment")
                         .font(AppTheme.Typography.body)
                         .fontWeight(.semibold)
-                        .foregroundColor(.black)
+                        .foregroundColor(AppTheme.Colors.pine)
                     Spacer()
                 }
                 .padding(.vertical, AppTheme.Spacing.sm)
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .cornerRadius(AppTheme.CornerRadius.small)
             }
 
@@ -250,10 +250,10 @@ struct ActiveCommitmentView: View {
                 Text("Active")
                     .font(AppTheme.Typography.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
                     .padding(.horizontal, AppTheme.Spacing.sm)
                     .padding(.vertical, 2)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.small)
             }
 
@@ -633,11 +633,11 @@ struct EditCommitmentSheet: View {
                         Text("Save Changes")
                             .font(AppTheme.Typography.body)
                             .fontWeight(.semibold)
-                            .foregroundColor(.black)
+                            .foregroundColor(AppTheme.Colors.pine)
                         Spacer()
                     }
                     .padding(.vertical, AppTheme.Spacing.md)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.medium)
                 }
                 .disabled(selectedType == currentType)
