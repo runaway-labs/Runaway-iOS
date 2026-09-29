@@ -39,6 +39,7 @@ struct AccountInformationView: View {
                     .padding(AppTheme.Spacing.lg)
                 }
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Account Information")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -48,7 +49,7 @@ struct AccountInformationView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -57,7 +58,7 @@ struct AccountInformationView: View {
                             await saveChanges()
                         }
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                     .disabled(isSaving || !hasChanges)
                 }
             }
@@ -75,7 +76,7 @@ struct AccountInformationView: View {
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 
     // MARK: - View Components

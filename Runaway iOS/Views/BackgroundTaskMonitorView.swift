@@ -421,6 +421,7 @@ struct BackgroundTaskDetailsView: View {
                 }
                 .padding()
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Background Task Details")
             .toolbarColorScheme(.light, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -429,11 +430,11 @@ struct BackgroundTaskDetailsView: View {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
     }
     
     private var backgroundAppRefreshStatus: String {

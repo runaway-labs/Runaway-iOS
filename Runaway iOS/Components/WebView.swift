@@ -219,6 +219,7 @@ struct ArticleWebView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle(article.source)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -231,7 +232,7 @@ struct ArticleWebView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -240,22 +241,23 @@ struct ArticleWebView: View {
                             Image(systemName: "chevron.left")
                         }
                         .disabled(!canGoBack)
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.LightMode.accent)
 
                         Button(action: goForward) {
                             Image(systemName: "chevron.right")
                         }
                         .disabled(!canGoForward)
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.LightMode.accent)
 
                         Button(action: openInSafari) {
                             Image(systemName: "safari")
                         }
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.LightMode.accent)
                     }
                 }
             }
         }
+        .tint(AppTheme.Colors.LightMode.accent)
     }
     
     private func goBack() {

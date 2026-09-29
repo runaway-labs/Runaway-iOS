@@ -29,6 +29,7 @@ struct ActivityTrendsView: View {
                 }
                 .padding()
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Activity Trends")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -38,11 +39,11 @@ struct ActivityTrendsView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 }
 

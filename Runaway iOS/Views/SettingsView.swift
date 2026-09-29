@@ -678,6 +678,7 @@ struct StravaConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Strava Integration")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -687,11 +688,11 @@ struct StravaConnectSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 
     private func connectToStrava() async {
@@ -1147,6 +1148,7 @@ struct GarminConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Garmin Integration")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -1156,11 +1158,11 @@ struct GarminConnectSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 
     private func connectToGarmin() async {

@@ -42,6 +42,7 @@ struct TrainingLoadView: View {
                 }
                 .padding()
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Training Load")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -51,10 +52,11 @@ struct TrainingLoadView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 }
 

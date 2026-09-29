@@ -442,6 +442,7 @@ struct GoalInputSheet: View {
                     }
                 }
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle(currentGoal == nil ? "Set Running Goal" : "Edit Goal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -451,6 +452,7 @@ struct GoalInputSheet: View {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                     .disabled(isSaving)
                 }
                 
@@ -458,16 +460,18 @@ struct GoalInputSheet: View {
                     if isSaving {
                         ProgressView()
                             .scaleEffect(0.8)
+                            .tint(AppTheme.Colors.LightMode.accent)
                     } else {
                         Button("Save") {
                             saveGoal()
                         }
+                        .foregroundColor(AppTheme.Colors.LightMode.accent)
                         .disabled(!isValidInput)
                     }
                 }
             }
         }
-        .tint(AppTheme.Colors.accent)
+        .tint(AppTheme.Colors.LightMode.accent)
         .onAppear {
             loadCurrentGoal()
         }

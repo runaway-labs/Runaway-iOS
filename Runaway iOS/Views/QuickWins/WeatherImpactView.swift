@@ -36,6 +36,7 @@ struct WeatherImpactView: View {
                 }
                 .padding()
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("Weather Impact")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -45,10 +46,11 @@ struct WeatherImpactView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 }
 

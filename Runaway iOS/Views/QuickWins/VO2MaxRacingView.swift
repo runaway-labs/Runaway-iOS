@@ -38,6 +38,7 @@ struct VO2MaxRacingView: View {
                 }
                 .padding()
             }
+            .tint(AppTheme.Colors.accent)
             .navigationTitle("VO2 Max & Racing")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.light, for: .navigationBar)
@@ -47,10 +48,11 @@ struct VO2MaxRacingView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.LightMode.accent)
                 }
             }
         }
+        .tint(AppTheme.Colors.LightMode.accent)
     }
 }
 
