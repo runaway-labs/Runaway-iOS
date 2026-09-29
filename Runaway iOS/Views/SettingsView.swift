@@ -410,15 +410,19 @@ struct SettingsView: View {
                     .padding(.horizontal)
             }
         }
-        .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                Task {
-                    await deleteAccount()
+        .background {
+            Color.clear
+                .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await deleteAccount()
+                        }
+                    }
+                } message: {
+                    Text("Are you sure you want to permanently delete your account? This action cannot be undone. All your activities, training plans, and data will be permanently removed.")
                 }
-            }
-        } message: {
-            Text("Are you sure you want to permanently delete your account? This action cannot be undone. All your activities, training plans, and data will be permanently removed.")
+                .adaptiveSurfaceTint()
         }
     }
 

@@ -69,6 +69,10 @@ struct Runaway_iOSApp: App {
         tabBarAppearance.inlineLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
         tabBarAppearance.inlineLayoutAppearance.selected.iconColor = selectedColor
         tabBarAppearance.inlineLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
+        tabBarAppearance.compactInlineLayoutAppearance.normal.iconColor = normalColor
+        tabBarAppearance.compactInlineLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
+        tabBarAppearance.compactInlineLayoutAppearance.selected.iconColor = selectedColor
+        tabBarAppearance.compactInlineLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
 
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance

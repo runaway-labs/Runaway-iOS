@@ -68,6 +68,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .adaptiveSurfaceTint()
                 }
 
                 Tab(RunawayTab.plan.title, systemImage: RunawayTab.plan.systemImage, value: RunawayTab.plan) {
@@ -77,6 +78,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .adaptiveSurfaceTint()
                 }
 
                 Tab(RunawayTab.activities.title, systemImage: RunawayTab.activities.systemImage, value: RunawayTab.activities) {
@@ -86,6 +88,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .adaptiveSurfaceTint()
                 }
 
                 Tab(RunawayTab.you.title, systemImage: RunawayTab.you.systemImage, value: RunawayTab.you) {
@@ -95,9 +98,11 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .adaptiveSurfaceTint()
                 }
             }
-            .adaptiveSurfaceTint()
+            // Amber matches UITabBarAppearance. An adaptive tint here is moss on the night-pine bar in Light, and it also leaks into every tab.
+            .tint(AppTheme.Colors.warmAmber)
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in
