@@ -99,7 +99,7 @@ struct StrengthRecommendationSettingsView: View {
                 set: model.setStrengthSuggestionsEnabled
             ))
             .labelsHidden()
-            .tint(AppTheme.Colors.strideLime)
+            .tint(AppTheme.Colors.accent)
             .accessibilityLabel("Strength focus suggestions")
         }
         .padding(AppTheme.Spacing.md)
@@ -163,7 +163,7 @@ struct StrengthRecommendationSettingsView: View {
                 set: { model.setStrengthZone(zone, available: $0) }
             ))
             .labelsHidden()
-            .tint(AppTheme.Colors.strideLime)
+            .tint(AppTheme.Colors.accent)
             .accessibilityLabel("Allow \(zone.rawValue) workouts")
         }
         .padding(.vertical, AppTheme.Spacing.sm)

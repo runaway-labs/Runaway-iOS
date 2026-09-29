@@ -83,8 +83,16 @@ struct AppTheme {
         // MARK: - Status
         static let success           = forestGreenLight
         static let successBackground = forestGreen.opacity(0.20)
-        static let warning           = RunawayPalette.warning // #E2B714
-        static let warningBackground = warning.opacity(0.15)
+        // Warning text and icons. #E2B714 in dark, #7A620A in light (5.87:1 on white).
+        // Fills and marks on an always-dark surface use DarkMode.warning, which stays #E2B714.
+        static var warning: Color {
+            Color(UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(DarkMode.warning)
+                    : UIColor(LightMode.warning)
+            })
+        }
+        static var warningBackground: Color { warning.opacity(0.15) }
         static let error             = Color(red: 1.0, green: 0.38, blue: 0.38)
         static let errorBackground   = Color(red: 1.0, green: 0.38, blue: 0.38).opacity(0.15)
         static let info              = infoBlueLight
@@ -95,7 +103,7 @@ struct AppTheme {
         static let iconSecondary = Color(red: 0.60, green: 0.63, blue: 0.68)
         static var iconAccent: Color { accent }
         static let iconSuccess  = forestGreenLight
-        static let iconWarning  = warning
+        static var iconWarning: Color { warning }
         static let iconError    = error
         static let iconMuted    = Color(red: 0.44, green: 0.47, blue: 0.51)
 
@@ -121,7 +129,7 @@ struct AppTheme {
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let warningGradient = LinearGradient(
-            colors: [warning, warning.opacity(0.75)],
+            colors: [DarkMode.warning, DarkMode.warning.opacity(0.75)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         static let errorGradient = LinearGradient(
@@ -178,6 +186,8 @@ struct AppTheme {
             // Accent text and tint. Lime is a fill only in light mode.
             static let accent             = moss
             static let accentBright       = pine
+            // Warning text and icons on light surfaces. Design confirmed #7A620A.
+            static let warning            = RunawayPalette.warningOnLight
         }
 
         // MARK: - Dark Mode (night pine + stride lime)
@@ -196,9 +206,11 @@ struct AppTheme {
             static let textTertiary   = RunawayPalette.textTertiary // #8E9992
             static let textQuaternary = Color(red: 0.267, green: 0.286, blue: 0.318) // #444951
 
-            // Accent
+            // Accent. Use this on surfaces that stay dark in both appearance modes.
             static let accent      = strideLime
             static let accentBright = strideLimePressed
+            // Warning text, icons, and indicators on always-dark surfaces.
+            static let warning     = RunawayPalette.warning
 
             // Tab bar matches backgroundElevated.
             static let tabBarBackground = backgroundElevated

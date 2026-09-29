@@ -125,9 +125,9 @@ struct TodayWorkoutDecisionSheet: View {
         if let blocker = model.blockerMessage {
             Label(blocker, systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline)
-                .foregroundStyle(AppTheme.Colors.warning)
+                .foregroundStyle(AppTheme.Colors.DarkMode.warning)
                 .padding(14)
-                .background(AppTheme.Colors.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                .background(AppTheme.Colors.DarkMode.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         }
     }
 
@@ -156,7 +156,7 @@ struct TodayWorkoutDecisionSheet: View {
                             if case .blocked(let blocker) = choice.availability {
                                 Label(blocker.message, systemImage: "exclamationmark.triangle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(AppTheme.Colors.warning)
+                                    .foregroundStyle(AppTheme.Colors.DarkMode.warning)
                             }
                         }
                         Spacer()

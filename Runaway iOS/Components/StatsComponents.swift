@@ -387,7 +387,7 @@ struct MiniWeeklyChart: View {
             ForEach(weeklyData, id: \.week) { data in
                 VStack(spacing: 4) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(data.week == 8 ? AppTheme.Colors.accent : AppTheme.Colors.accent.opacity(0.4))
+                        .fill(data.week == 8 ? AppTheme.Colors.DarkMode.accent : AppTheme.Colors.DarkMode.accent.opacity(0.4))
                         .frame(height: max(4, CGFloat(data.miles / maxMiles) * 50))
                 }
                 .frame(maxWidth: .infinity)

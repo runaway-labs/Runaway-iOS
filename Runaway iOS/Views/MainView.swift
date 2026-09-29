@@ -193,7 +193,7 @@ struct MainView: View {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button(action: { router.navigate(to: .settings) }) {
                                 Image(systemName: "gearshape.fill")
-                                    .foregroundColor(AppTheme.Colors.accent)
+                                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
                             }
                         }
                     }
@@ -214,7 +214,7 @@ struct MainView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { router.navigate(to: .settings) }) {
                             Image(systemName: "gearshape.fill")
-                                .foregroundColor(AppTheme.Colors.accent)
+                                .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
                     }
                 }
@@ -232,7 +232,7 @@ struct MainView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { router.navigate(to: .settings) }) {
                             Image(systemName: "gearshape.fill")
-                                .foregroundColor(AppTheme.Colors.accent)
+                                .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
                     }
                 }

@@ -40,7 +40,7 @@ struct StrengthZoneSelectionView: View {
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(AppTheme.Colors.warning)
+                    .foregroundStyle(AppTheme.Colors.DarkMode.warning)
             }
 
             Button { onBuild(duration) } label: {

@@ -29,7 +29,9 @@ enum RunawayPalette {
     static let amber = Color(red: channel(245), green: channel(158), blue: channel(11)) // #F59E0B
 
     // Severity. Not amber, and not a weather color.
+    // #E2B714 is the dark-surface warning. Light-mode text and icons use warningOnLight.
     static let warning = Color(red: channel(226), green: channel(183), blue: channel(20)) // #E2B714
+    static let warningOnLight = Color(red: channel(122), green: channel(98), blue: channel(10)) // #7A620A
 
     // Informational blue. Named so it is not confused with stride lime.
     static let infoBlue = Color(red: channel(56), green: channel(148), blue: channel(250)) // #3894FA

@@ -91,7 +91,7 @@ struct EmptyInsightsStateView: View {
         VStack(spacing: AppTheme.Spacing.xl) {
             Image(systemName: "chart.bar.doc.horizontal")
                 .font(.system(size: 80))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
 
             VStack(spacing: AppTheme.Spacing.sm) {
                 Text("Your Today view is ready")
@@ -127,7 +127,7 @@ struct LoadingInsightsStateView: View {
 
                 Circle()
                     .trim(from: 0, to: 0.7)
-                    .stroke(AppTheme.Colors.accent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(AppTheme.Colors.DarkMode.accent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .frame(width: 80, height: 80)
                     .rotationEffect(.degrees(animationPhase))
                     .animation(.linear(duration: 2).repeatForever(autoreverses: false), value: animationPhase)

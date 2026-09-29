@@ -151,7 +151,7 @@ struct EmptyActivitiesView: View {
         VStack(spacing: AppTheme.Spacing.lg) {
             Image(systemName: "figure.run.circle")
                 .font(.system(size: 80))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
 
             VStack(spacing: AppTheme.Spacing.sm) {
                 Text("No Activities Yet")

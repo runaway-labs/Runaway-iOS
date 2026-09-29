@@ -36,14 +36,22 @@ struct Runaway_iOSApp: App {
         navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
         navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
 
+        // The bar stays night pine in both appearances, so the tint is the dark accent.
+        let navTint = UIColor(AppTheme.Colors.DarkMode.accent)
         navAppearance.buttonAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor(AppTheme.Colors.accent)
+            .foregroundColor: navTint
+        ]
+        navAppearance.doneButtonAppearance.normal.titleTextAttributes = [
+            .foregroundColor: navTint
+        ]
+        navAppearance.backButtonAppearance.normal.titleTextAttributes = [
+            .foregroundColor: navTint
         ]
 
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
-        UINavigationBar.appearance().tintColor = UIColor(AppTheme.Colors.accent)
+        UINavigationBar.appearance().tintColor = navTint
 
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
