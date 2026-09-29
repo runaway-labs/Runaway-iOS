@@ -49,6 +49,7 @@ struct BackgroundTaskMonitorView: View {
         .sheet(isPresented: $showingDetails) {
             BackgroundTaskDetailsView()
         }
+        .tint(AppTheme.Colors.accent)
         #if DEBUG
         .task {
             guard let athleteID = UserSession.shared.userId else { return }
@@ -432,6 +433,7 @@ struct BackgroundTaskDetailsView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
     
     private var backgroundAppRefreshStatus: String {

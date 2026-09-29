@@ -58,6 +58,7 @@ struct CoachDecisionDetailView: View {
                 actionButtons(decision)
             }.padding(AppTheme.Spacing.md) } else { ProgressView().padding(.top, 80) }
         }.background(AppTheme.Colors.adaptiveBackground).navigationTitle("Coach decision").navigationBarTitleDisplayMode(.inline)
+            .tint(AppTheme.Colors.accent)
             .task { load(); await loadNarration() }
             .alert("Couldn’t apply that change", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) { }

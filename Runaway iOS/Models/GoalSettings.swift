@@ -211,6 +211,7 @@ struct GoalSettingsView: View {
                 loadDisplayValues()
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     /// Load values from store and convert to display units

@@ -208,6 +208,7 @@ struct MainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(backgroundColor)
+                .tint(AppTheme.Colors.accent)
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -318,7 +319,7 @@ private struct ProfileLoadingErrorView: View {
                 }) {
                     HStack(spacing: AppTheme.Spacing.sm) {
                         if isRetrying {
-                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.pine))
                         } else {
                             Image(systemName: "arrow.clockwise")
                         }
@@ -334,5 +335,6 @@ private struct ProfileLoadingErrorView: View {
             }
             .padding(AppTheme.Spacing.xl)
         }
+        .tint(AppTheme.Colors.accent)
     }
 }

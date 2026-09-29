@@ -90,6 +90,7 @@ struct WorkoutPromptSettingsView: View {
             .disabled(saving)
             .task { await load() }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func load() async {
@@ -157,6 +158,7 @@ struct WorkoutPromptDeliveryView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
         .task {
             do {
                 guard UserSession.shared.userId == route.athleteID else { loading = false; return }

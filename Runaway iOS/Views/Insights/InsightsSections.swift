@@ -527,7 +527,7 @@ struct WeeklyPlanSection: View {
                         HStack {
                             if isGenerating {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.pine))
                                     .scaleEffect(0.8)
                             } else {
                                 Image(systemName: "sparkles")

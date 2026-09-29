@@ -42,6 +42,7 @@ struct ActivityTrendsView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 }
 

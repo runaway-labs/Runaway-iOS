@@ -81,6 +81,7 @@ struct SettingsView: View {
                 .padding(AppTheme.Spacing.md)
             }
         }
+        .tint(AppTheme.Colors.accent)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(themeManager.isDarkMode ? .dark : .light, for: .navigationBar)
@@ -690,6 +691,7 @@ struct StravaConnectSheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func connectToStrava() async {
@@ -1158,6 +1160,7 @@ struct GarminConnectSheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func connectToGarmin() async {

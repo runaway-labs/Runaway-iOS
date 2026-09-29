@@ -50,6 +50,7 @@ struct RestDayHistoryView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     // MARK: - Recovery Status Card
@@ -375,6 +376,7 @@ struct MarkRestDaySheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func saveRestDay() async {

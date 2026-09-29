@@ -48,6 +48,7 @@ struct CoachActivityView: View {
                 recommendationOnly: entry.recommendationOnly
             )
         }
+        .tint(AppTheme.Colors.accent)
     }
     private func heading(_ title: String, _ detail: String) -> some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {

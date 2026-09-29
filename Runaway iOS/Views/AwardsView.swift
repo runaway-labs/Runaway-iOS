@@ -96,6 +96,7 @@ struct AwardsView: View {
                 AwardDetailSheetFromStats(award: award)
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private var filteredAwards: [(award: AwardDefinition, isEarned: Bool, progress: Double)] {
@@ -481,6 +482,7 @@ struct AwardsPreviewSection: View {
                 AwardDetailSheetFromStats(award: award)
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func loadEarnedAwards() async {
@@ -691,6 +693,7 @@ struct AwardDetailSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .tint(AppTheme.Colors.accent)
     }
 
     private func remainingText(remaining: Double) -> String {
@@ -904,6 +907,7 @@ struct AwardDetailSheetFromStats: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .tint(AppTheme.Colors.accent)
     }
 
     private func remainingText(remaining: Double) -> String {

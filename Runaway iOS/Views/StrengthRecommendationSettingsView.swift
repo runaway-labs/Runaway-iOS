@@ -63,6 +63,7 @@ struct StrengthRecommendationSettingsView: View {
                 if receipt != nil { dismiss() }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private var introduction: some View {

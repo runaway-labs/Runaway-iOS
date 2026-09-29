@@ -467,6 +467,7 @@ struct GoalInputSheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
         .onAppear {
             loadCurrentGoal()
         }

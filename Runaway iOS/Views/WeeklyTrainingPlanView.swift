@@ -451,6 +451,7 @@ struct WorkoutDetailSheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private var formattedDate: String {

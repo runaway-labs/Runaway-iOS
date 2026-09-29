@@ -380,6 +380,7 @@ struct ReadinessDetailView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     @MainActor
@@ -776,6 +777,7 @@ struct ReadinessCalculationSheet: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     private func calculateReadiness() async {

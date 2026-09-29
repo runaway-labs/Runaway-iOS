@@ -75,6 +75,7 @@ struct AccountInformationView: View {
                 }
             }
         }
+        .tint(AppTheme.Colors.accent)
     }
 
     // MARK: - View Components

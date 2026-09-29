@@ -56,40 +56,44 @@ struct TrainingProfileView: View {
                         .disabled(model.isRegenerating)
                 }
             }
-            .confirmationDialog(
-                "When should your plan reflect this profile?",
-                isPresented: $model.isPresentingRegenerationChoices,
-                titleVisibility: .visible
-            ) {
-                Button("Update Next Week (Recommended)") {
-                    Task { await model.regenerate(scope: .nextWeek) }
-                }
-                Button(model.currentWeekActionTitle) {
-                    Task { await model.regenerate(scope: .remainingCurrentWeek) }
-                }
-                Button("Cancel", role: .cancel) {
-                    model.cancelRegeneration()
-                }
-            } message: {
-                Text("Your profile is saved. Completed workouts will stay protected.")
-            }
-            .alert(
-                "Plan Update Failed",
-                isPresented: Binding(
-                    get: { model.errorMessage != nil },
-                    set: { if !$0 { model.dismissError() } }
-                )
-            ) {
-                if model.canRetry {
-                    Button("Retry") {
-                        Task { await model.retry() }
+            .background {
+                Color.clear
+                    .tint(AppTheme.Colors.accent)
+                    .confirmationDialog(
+                        "When should your plan reflect this profile?",
+                        isPresented: $model.isPresentingRegenerationChoices,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Update Next Week (Recommended)") {
+                            Task { await model.regenerate(scope: .nextWeek) }
+                        }
+                        Button(model.currentWeekActionTitle) {
+                            Task { await model.regenerate(scope: .remainingCurrentWeek) }
+                        }
+                        Button("Cancel", role: .cancel) {
+                            model.cancelRegeneration()
+                        }
+                    } message: {
+                        Text("Your profile is saved. Completed workouts will stay protected.")
                     }
-                }
-                Button("Not Now", role: .cancel) {
-                    model.dismissError()
-                }
-            } message: {
-                Text(model.errorMessage ?? "Your saved profile is safe and your previous plan is unchanged.")
+                    .alert(
+                        "Plan Update Failed",
+                        isPresented: Binding(
+                            get: { model.errorMessage != nil },
+                            set: { if !$0 { model.dismissError() } }
+                        )
+                    ) {
+                        if model.canRetry {
+                            Button("Retry") {
+                                Task { await model.retry() }
+                            }
+                        }
+                        Button("Not Now", role: .cancel) {
+                            model.dismissError()
+                        }
+                    } message: {
+                        Text(model.errorMessage ?? "Your saved profile is safe and your previous plan is unchanged.")
+                    }
             }
             .onChange(of: model.shouldDismiss) { _, shouldDismiss in
                 if shouldDismiss { dismiss() }

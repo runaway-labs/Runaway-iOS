@@ -123,18 +123,19 @@ private struct PerformanceCoachDecisionRouteView: View {
                 description: Text("Open Today after your training plan is ready.")
             )
             .navigationTitle("Performance Coach")
+            .tint(AppTheme.Colors.accent)
         }
     }
 }
 
 private struct CoachActivityRouteView: View {
     @Environment(UserSession.self) private var session
-    var body: some View { if let id = session.userId { CoachActivityView(athleteID: id) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
+    var body: some View { if let id = session.userId { CoachActivityView(athleteID: id) } else { ContentUnavailableView("Sign in required", systemImage: "lock").tint(AppTheme.Colors.accent) } }
 }
 private struct CoachDecisionRouteView: View {
     @Environment(UserSession.self) private var session
     let decisionID: UUID
-    var body: some View { if let id = session.userId { CoachDecisionDetailView(athleteID: id, decisionID: decisionID) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
+    var body: some View { if let id = session.userId { CoachDecisionDetailView(athleteID: id, decisionID: decisionID) } else { ContentUnavailableView("Sign in required", systemImage: "lock").tint(AppTheme.Colors.accent) } }
 }
 
 private struct RoutedActivityDetailView: View {
@@ -161,6 +162,7 @@ private struct RoutedActivityDetailView: View {
             )
         } else if isLoading {
             ProgressView("Loading activity...")
+                .tint(AppTheme.Colors.accent)
         } else {
             ContentUnavailableView(
                 "Activity unavailable",
@@ -168,6 +170,7 @@ private struct RoutedActivityDetailView: View {
                 description: Text("This activity may have been removed, or your connection is unavailable.")
             )
             .navigationTitle("Activity")
+            .tint(AppTheme.Colors.accent)
         }
         }
         .task(id: activityId) { await loadActivity() }

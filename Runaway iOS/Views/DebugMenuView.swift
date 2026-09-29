@@ -126,6 +126,7 @@ struct DebugMenuView: View {
         .sheet(isPresented: $showingBackgroundMonitor) {
             BackgroundTaskMonitorView()
         }
+        .tint(AppTheme.Colors.accent)
         .onAppear {
             loadAPNsToken()
             checkNotificationStatus()

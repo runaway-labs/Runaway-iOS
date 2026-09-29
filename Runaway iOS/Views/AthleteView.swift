@@ -162,6 +162,7 @@ struct AthleteView: View {
                 AthleteTrainingProfileView(athleteID: athleteID)
             } else {
                 ContentUnavailableView("Sign in required", systemImage: "lock")
+                    .tint(AppTheme.Colors.accent)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: MilestoneService.didUpdateNotification)) { _ in
