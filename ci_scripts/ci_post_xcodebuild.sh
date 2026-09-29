@@ -1,32 +1,34 @@
-#!/bin/zsh
-
+#!/bin/sh
 # ci_post_xcodebuild.sh
-# Xcode Cloud script to notify Discord after the build finishes.
+# Notifies Discord after an Xcode Cloud build.
+# A missing webhook or a failed request must not change the build result.
 
-if [[ -z "$DISCORD_WEBHOOK" ]]; then
-    echo "Error: DISCORD_WEBHOOK environment variable is not set in Xcode Cloud."
-    exit 0
+if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+  echo "warning: DISCORD_WEBHOOK is not set; skipping Discord notification"
+  exit 0
 fi
 
-# Determine status and color
-if [[ "$CI_XCODEBUILD_EXIT_CODE" -eq 0 ]]; then
-    STATUS="Success ✅"
-    COLOR=6750059 # Green (#66FF6B)
-else
-    STATUS="Failed ❌"
-    COLOR=16724787 # Red (#FF3133)
-fi
+case "${CI_XCODEBUILD_EXIT_CODE:-}" in
+  0)
+    status="Success ✅"
+    color=6750059
+    ;;
+  *)
+    status="Failed ❌"
+    color=16724787
+    ;;
+esac
 
-# Construct payload
-# We use the Sarisia-style format to match the platform builds
-PAYLOAD=$(cat <<EOF
+# Unquoted heredoc so CI_* values expand. Backticks around the commit are
+# escaped so they stay literal markdown.
+payload=$(cat <<EOF
 {
   "embeds": [{
-    "title": "Runaway iOS: $STATUS",
-    "description": "**Workflow**: $CI_WORKFLOW\n**Build**: #$CI_BUILD_NUMBER\n**Commit**: \`$CI_COMMIT\`",
-    "color": $COLOR,
+    "title": "Runaway iOS: $status",
+    "description": "**Workflow**: ${CI_WORKFLOW:-}\n**Build**: #${CI_BUILD_NUMBER:-}\n**Commit**: \`${CI_COMMIT:-}\`",
+    "color": $color,
     "footer": {
-      "text": "Xcode Cloud • $CI_PRODUCT"
+      "text": "Xcode Cloud • ${CI_PRODUCT:-}"
     },
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   }]
@@ -34,5 +36,18 @@ PAYLOAD=$(cat <<EOF
 EOF
 )
 
-# Send to Discord
-curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK"
+# --fail turns HTTP errors into a non-zero curl status. Timeouts bound a
+# hung endpoint. stderr is discarded so curl cannot print the webhook URL.
+if ! curl --fail --silent \
+  --connect-timeout 10 \
+  --max-time 30 \
+  -o /dev/null \
+  -X POST \
+  -H "Content-Type: application/json" \
+  --data "$payload" \
+  -- "$DISCORD_WEBHOOK"
+then
+  echo "warning: Discord notification failed; build result is unchanged" >&2
+fi
+
+exit 0
