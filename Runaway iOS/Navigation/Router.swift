@@ -131,12 +131,28 @@ private struct PerformanceCoachDecisionRouteView: View {
 
 private struct CoachActivityRouteView: View {
     @Environment(UserSession.self) private var session
-    var body: some View { if let id = session.userId { CoachActivityView(athleteID: id) } else { ContentUnavailableView("Sign in required", systemImage: "lock").adaptiveSurfaceTint() } }
+    var body: some View {
+        if let id = session.userId {
+            CoachActivityView(athleteID: id)
+        } else {
+            ContentUnavailableView("Sign in required", systemImage: "lock")
+                .adaptiveSurfaceTint()
+                .darkSurfaceTint()
+        }
+    }
 }
 private struct CoachDecisionRouteView: View {
     @Environment(UserSession.self) private var session
     let decisionID: UUID
-    var body: some View { if let id = session.userId { CoachDecisionDetailView(athleteID: id, decisionID: decisionID) } else { ContentUnavailableView("Sign in required", systemImage: "lock").adaptiveSurfaceTint() } }
+    var body: some View {
+        if let id = session.userId {
+            CoachDecisionDetailView(athleteID: id, decisionID: decisionID)
+        } else {
+            ContentUnavailableView("Sign in required", systemImage: "lock")
+                .adaptiveSurfaceTint()
+                .darkSurfaceTint()
+        }
+    }
 }
 
 private struct RoutedActivityDetailView: View {
@@ -164,6 +180,7 @@ private struct RoutedActivityDetailView: View {
         } else if isLoading {
             ProgressView("Loading activity...")
                 .adaptiveSurfaceTint()
+                .darkSurfaceTint()
         } else {
             ContentUnavailableView(
                 "Activity unavailable",

@@ -58,6 +58,8 @@ struct MainView: View {
 
     var body: some View {
         if isDataReady {
+            // Each stack is lime so night-pine bar chrome, back chevrons, and toolbar items stay lime.
+            // Light or adaptive content sets its own adaptive tint inside the stack.
             TabView(selection: $selectedTab) {
                 Tab(RunawayTab.today.title, systemImage: RunawayTab.today.systemImage, value: RunawayTab.today) {
                     NavigationStack(path: Bindable(router).path) {
@@ -68,7 +70,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
-                    .adaptiveSurfaceTint()
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.plan.title, systemImage: RunawayTab.plan.systemImage, value: RunawayTab.plan) {
@@ -78,7 +80,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
-                    .adaptiveSurfaceTint()
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.activities.title, systemImage: RunawayTab.activities.systemImage, value: RunawayTab.activities) {
@@ -88,7 +90,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
-                    .adaptiveSurfaceTint()
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.you.title, systemImage: RunawayTab.you.systemImage, value: RunawayTab.you) {
@@ -98,7 +100,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
-                    .adaptiveSurfaceTint()
+                    .darkSurfaceTint()
                 }
             }
             // Amber matches UITabBarAppearance. An adaptive tint here is moss on the night-pine bar in Light, and it also leaks into every tab.
@@ -200,6 +202,7 @@ struct MainView: View {
                                 Image(systemName: "gearshape.fill")
                                     .foregroundColor(AppTheme.Colors.DarkMode.accent)
                             }
+                            .darkSurfaceTint()
                         }
                     }
             } else if dataManager.isLoadingAthlete {
@@ -213,6 +216,7 @@ struct MainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(backgroundColor)
+                .adaptiveSurfaceTint()
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -221,6 +225,7 @@ struct MainView: View {
                             Image(systemName: "gearshape.fill")
                                 .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
+                        .darkSurfaceTint()
                     }
                 }
             } else {
@@ -231,6 +236,7 @@ struct MainView: View {
                         }
                     }
                 })
+                .adaptiveSurfaceTint()
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -239,6 +245,7 @@ struct MainView: View {
                             Image(systemName: "gearshape.fill")
                                 .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
+                        .darkSurfaceTint()
                     }
                 }
             }
