@@ -103,8 +103,8 @@ struct MainView: View {
                     .darkSurfaceTint()
                 }
             }
-            // Amber matches UITabBarAppearance. An adaptive tint here is moss on the night-pine bar in Light, and it also leaks into every tab.
-            .tint(AppTheme.Colors.warmAmber)
+            // Tab chrome is always night pine; light content opts into its own adaptive tint.
+            .darkSurfaceTint()
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in

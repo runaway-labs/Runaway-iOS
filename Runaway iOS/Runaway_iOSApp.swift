@@ -56,7 +56,7 @@ struct Runaway_iOSApp: App {
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
 
-        let selectedColor = UIColor(AppTheme.Colors.warmAmber)
+        let selectedColor = UIColor(AppTheme.Colors.DarkMode.accent)
         // Always dark tab bar (Copilot-style)
         tabBarAppearance.backgroundColor = UIColor(AppTheme.Colors.DarkMode.background)
         let normalColor = UIColor(AppTheme.Colors.DarkMode.textTertiary)
