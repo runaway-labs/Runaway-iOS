@@ -123,20 +123,10 @@ struct SignUpView: View {
                     }
                     .padding(.horizontal, AppTheme.Spacing.lg)
 
-                    // Terms agreement
-                    HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-                        Button(action: { viewModel.agreedToTerms.toggle() }) {
-                            Image(systemName: viewModel.agreedToTerms ? "checkmark.square.fill" : "square")
-                                .font(.system(size: 20))
-                                .foregroundColor(viewModel.agreedToTerms ? AppTheme.Colors.accent : .secondary)
-                        }
-
-                        Text("I agree to the Terms of Service and Privacy Policy")
-                            .font(AppTheme.Typography.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                    }
-                    .padding(.horizontal, AppTheme.Spacing.lg)
+                    // Terms agreement. The checkbox and the legal links are separate
+                    // accessibility elements so VoiceOver can activate each link on its own.
+                    SignUpTermsAgreement(isAgreed: $viewModel.agreedToTerms)
+                        .padding(.horizontal, AppTheme.Spacing.lg)
 
                     // Sign up button
                     AuthButton(
@@ -204,6 +194,76 @@ struct SignUpView: View {
                 showError = true
             }
         }
+    }
+}
+
+// MARK: - Terms agreement
+
+/// Checkbox plus Terms of Service and Privacy Policy links.
+/// The links match the destinations in Settings.
+private struct SignUpTermsAgreement: View {
+    @Binding var isAgreed: Bool
+
+    private static let termsOfServiceURL = URL(string: "https://runawayendurance.com/terms")!
+    private static let privacyPolicyURL = URL(string: "https://runawayendurance.com/privacy")!
+
+    private let glyphSize: CGFloat = 20
+    private let hitSize: CGFloat = 44
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
+            checkbox
+
+            legalCopy
+                .padding(.top, (hitSize - glyphSize) / 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var checkbox: some View {
+        Button(action: { isAgreed.toggle() }) {
+            Image(systemName: isAgreed ? "checkmark.square.fill" : "square")
+                .font(.system(size: glyphSize))
+                .foregroundColor(isAgreed ? AppTheme.Colors.accent : .secondary)
+                .frame(width: hitSize, height: hitSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("I agree to the Terms of Service and Privacy Policy")
+        .accessibilityValue(isAgreed ? "Checked" : "Unchecked")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(isAgreed ? .isSelected : [])
+    }
+
+    private var legalCopy: some View {
+        FlowLayout(spacing: AppTheme.Spacing.xs) {
+            Text("I agree to the")
+                .font(AppTheme.Typography.caption)
+                .foregroundColor(.secondary)
+                .accessibilityHidden(true)
+
+            legalLink("Terms of Service", url: Self.termsOfServiceURL)
+
+            Text("and")
+                .font(AppTheme.Typography.caption)
+                .foregroundColor(.secondary)
+                .accessibilityHidden(true)
+
+            legalLink("Privacy Policy", url: Self.privacyPolicyURL)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func legalLink(_ title: String, url: URL) -> some View {
+        Link(destination: url) {
+            Text(title)
+                .font(AppTheme.Typography.caption)
+                .underline()
+                .foregroundColor(AppTheme.Colors.accent)
+        }
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(.isLink)
     }
 }
 
