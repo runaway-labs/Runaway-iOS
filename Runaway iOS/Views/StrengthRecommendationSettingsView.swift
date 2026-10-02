@@ -47,15 +47,18 @@ struct StrengthRecommendationSettingsView: View {
                     .padding(AppTheme.Spacing.md)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Strength recommendations")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .darkSurfaceTint()
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(model.isSaving ? "Saving..." : "Save") { model.save() }
                         .disabled(!model.loaded || model.isSaving)
+                        .darkSurfaceTint()
                 }
             }
             .task { model.load() }
@@ -63,6 +66,7 @@ struct StrengthRecommendationSettingsView: View {
                 if receipt != nil { dismiss() }
             }
         }
+        .darkSurfaceTint()
     }
 
     private var introduction: some View {
@@ -99,7 +103,7 @@ struct StrengthRecommendationSettingsView: View {
                 set: model.setStrengthSuggestionsEnabled
             ))
             .labelsHidden()
-            .tint(AppTheme.Colors.warmAmber)
+            .adaptiveSurfaceTint()
             .accessibilityLabel("Strength focus suggestions")
         }
         .padding(AppTheme.Spacing.md)
@@ -163,7 +167,7 @@ struct StrengthRecommendationSettingsView: View {
                 set: { model.setStrengthZone(zone, available: $0) }
             ))
             .labelsHidden()
-            .tint(AppTheme.Colors.warmAmber)
+            .adaptiveSurfaceTint()
             .accessibilityLabel("Allow \(zone.rawValue) workouts")
         }
         .padding(.vertical, AppTheme.Spacing.sm)

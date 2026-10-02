@@ -162,8 +162,10 @@ struct AthleteView: View {
                 AthleteTrainingProfileView(athleteID: athleteID)
             } else {
                 ContentUnavailableView("Sign in required", systemImage: "lock")
+                    .adaptiveSurfaceTint()
             }
         }
+        .darkSurfaceTint()
         .onReceive(NotificationCenter.default.publisher(for: MilestoneService.didUpdateNotification)) { _ in
             guard let athleteId = athlete.id else { return }
             Task {
@@ -419,19 +421,19 @@ struct QuickStatsGrid: View {
     
     var body: some View {
         HStack(spacing: 0) {
-            QuickStatItem(value: runs, label: "RUNS", color: AppTheme.Colors.accent)
+            QuickStatItem(value: runs, label: "RUNS", color: AppTheme.Colors.DarkMode.accent)
             
             Divider()
                 .frame(height: 40)
                 .background(Color.white.opacity(0.08))
             
-            QuickStatItem(value: miles, label: "MILES", color: AppTheme.Colors.accent)
+            QuickStatItem(value: miles, label: "MILES", color: AppTheme.Colors.DarkMode.accent)
             
             Divider()
                 .frame(height: 40)
                 .background(Color.white.opacity(0.08))
             
-            QuickStatItem(value: hours, label: "HOURS", color: AppTheme.Colors.accent)
+            QuickStatItem(value: hours, label: "HOURS", color: AppTheme.Colors.DarkMode.accent)
         }
         .padding(.vertical, 20)
         .background(AppTheme.Colors.DarkMode.cardBackground)

@@ -79,17 +79,23 @@ struct WorkoutPromptSettingsView: View {
                 } else { ProgressView("Loading your preferences") }
                 if let error { Section { Text(error).foregroundStyle(.red); Button("Retry") { Task { await load() } } } }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Workout notifications")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .darkSurfaceTint()
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(saving ? "Saving..." : "Save") { Task { await save() } }
                         .disabled(draft == nil || saving || validationMessage != nil)
+                        .darkSurfaceTint()
                 }
             }
             .disabled(saving)
             .task { await load() }
         }
+        .darkSurfaceTint()
     }
 
     private func load() async {
@@ -145,9 +151,16 @@ struct WorkoutPromptDeliveryView: View {
                                 .font(.title2.bold())
                             Text(error ?? "This notification may be from an earlier day, or your training has changed. Open Today for a current recommendation.")
                                 .foregroundStyle(.secondary).multilineTextAlignment(.center)
-                            Button("Open Today", action: openToday).buttonStyle(.borderedProminent)
+                            Button("Open Today", action: openToday)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(AppTheme.Colors.pine)
+                                .padding(.horizontal, AppTheme.Spacing.lg)
+                                .padding(.vertical, AppTheme.Spacing.sm)
+                                .background(AppTheme.Colors.strideLime)
+                                .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                         }
                     }.padding()
+                        .adaptiveSurfaceTint()
                 }
             }
         }

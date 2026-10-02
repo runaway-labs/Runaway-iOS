@@ -17,7 +17,7 @@ struct CourseReconView: View {
                     VStack(spacing: 20) {
                         ProgressView()
                             .scaleEffect(1.5)
-                            .tint(AppTheme.Colors.accent)
+                            .tint(AppTheme.Colors.DarkMode.accent)
                         Text("Analyzing Terrain...")
                             .font(AppTheme.Typography.body)
                             .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
@@ -58,9 +58,11 @@ struct CourseReconView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .task { await loadCourse() }
     }
 
@@ -79,7 +81,7 @@ struct CourseReconView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "brain.head.profile")
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
                 Text("Analyzing terrain...")
                     .font(AppTheme.Typography.body)
             }
@@ -105,7 +107,7 @@ struct CourseReconView: View {
         VStack(spacing: 20) {
             Image(systemName: "map.fill")
                 .font(.system(size: 60))
-                .foregroundColor(AppTheme.Colors.accent.opacity(0.5))
+                .foregroundColor(AppTheme.Colors.DarkMode.accent.opacity(0.5))
             Text("No Course Data Available")
                 .font(AppTheme.Typography.headline)
             Text("We couldn't find a spatial map for this race yet.")
@@ -204,7 +206,7 @@ struct TacticalMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(AppTheme.Colors.accent)
+                renderer.strokeColor = UIColor(AppTheme.Colors.warmAmber)
                 renderer.lineWidth = 4
                 renderer.lineCap = .round
                 return renderer
@@ -332,10 +334,10 @@ struct ElevationChart: View {
 
                     ZStack(alignment: .leading) {
                         path.fill(LinearGradient(
-                            colors: [AppTheme.Colors.accent.opacity(0.35), AppTheme.Colors.accent.opacity(0.05)],
+                            colors: [AppTheme.Colors.DarkMode.accent.opacity(0.35), AppTheme.Colors.DarkMode.accent.opacity(0.05)],
                             startPoint: .top, endPoint: .bottom
                         ))
-                        strokePath.stroke(AppTheme.Colors.accent, lineWidth: 1.5)
+                        strokePath.stroke(AppTheme.Colors.DarkMode.accent, lineWidth: 1.5)
 
                         // Selected mile vertical line
                         if selectedMile > 0 {
@@ -373,7 +375,7 @@ struct TacticalInsightRow: View {
                 Text(String(format: "%.1f", insight.mile))
                     .font(.system(size: 16, weight: .heavy, design: .monospaced))
             }
-            .foregroundColor(AppTheme.Colors.accent)
+            .foregroundColor(AppTheme.Colors.DarkMode.accent)
             .frame(width: 50)
 
             VStack(alignment: .leading, spacing: 4) {

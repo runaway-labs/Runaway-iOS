@@ -43,8 +43,8 @@ struct CompleteGoalSessionPreviewView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(16)
-                        .background(AppTheme.Colors.strideBlue.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppTheme.Colors.strideBlue.opacity(0.18)))
+                        .background(AppTheme.Colors.infoBlue.opacity(0.06), in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(AppTheme.Colors.infoBlue.opacity(0.18)))
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Keep this snapshot current").font(.subheadline.bold())
@@ -54,10 +54,10 @@ struct CompleteGoalSessionPreviewView: View {
                     }.font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: 640, alignment: .leading).padding(20)
             }
-            .background(LinearGradient(colors: [AppTheme.Colors.strideBlue.opacity(0.08), Color(.systemBackground)], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .background(LinearGradient(colors: [AppTheme.Colors.infoBlue.opacity(0.08), Color(.systemBackground)], startPoint: .topLeading, endPoint: .bottomTrailing))
             .navigationTitle("Session previews")
             .navigationBarTitleDisplayMode(.inline)
-            .tint(AppTheme.Colors.strideBlue)
+            .tint(AppTheme.Colors.infoBlue)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(item: $recording) { TrainingSessionResultView(reference: $0) }
             .sheet(isPresented: $showingResults) {

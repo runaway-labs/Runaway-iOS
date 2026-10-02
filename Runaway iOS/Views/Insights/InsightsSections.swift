@@ -147,9 +147,9 @@ struct UnifiedRecommendationsBanner: View {
                     Text("\(index + 1)")
                         .font(AppTheme.Typography.caption)
                         .fontWeight(.bold)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .frame(width: 20, height: 20)
-                        .background(AppTheme.Colors.accent)
+                        .background(AppTheme.Colors.strideLime)
                         .clipShape(Circle())
 
                     Text(recommendation)
@@ -527,7 +527,7 @@ struct WeeklyPlanSection: View {
                         HStack {
                             if isGenerating {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.pine))
                                     .scaleEffect(0.8)
                             } else {
                                 Image(systemName: "sparkles")
@@ -536,10 +536,10 @@ struct WeeklyPlanSection: View {
                         }
                         .font(AppTheme.Typography.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(AppTheme.Colors.accent)
+                        .background(AppTheme.Colors.strideLime)
                         .cornerRadius(AppTheme.CornerRadius.medium)
                     }
                     .disabled(isGenerating)
@@ -738,10 +738,10 @@ struct CompactWorkoutRow: View {
                     Text(workout.dayOfWeek.shortName)
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundColor(isToday ? .white : AppTheme.Colors.adaptiveTextSecondary)
+                        .foregroundColor(isToday ? AppTheme.Colors.pine : AppTheme.Colors.adaptiveTextSecondary)
                 }
                 .frame(width: 36, height: 36)
-                .background(isToday ? AppTheme.Colors.accent : AppTheme.Colors.adaptiveSurfaceBackground)
+                .background(isToday ? AppTheme.Colors.strideLime : AppTheme.Colors.adaptiveSurfaceBackground)
                 .cornerRadius(8)
 
                 // Workout type icon

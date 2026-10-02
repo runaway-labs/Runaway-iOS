@@ -5,7 +5,7 @@ struct DigitalTwinMirrorCard: View {
     @State private var isLoading = true
     
     private var bg:   Color { AppTheme.Colors.DarkMode.cardBackground }
-    private var accent: Color { AppTheme.Colors.accent }
+    private var accent: Color { AppTheme.Colors.DarkMode.accent }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

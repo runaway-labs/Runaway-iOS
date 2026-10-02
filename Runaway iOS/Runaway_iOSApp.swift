@@ -36,19 +36,27 @@ struct Runaway_iOSApp: App {
         navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
         navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
 
+        // The bar stays night pine in both appearances, so the tint is the dark accent.
+        let navTint = UIColor(AppTheme.Colors.DarkMode.accent)
         navAppearance.buttonAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor(AppTheme.Colors.accent)
+            .foregroundColor: navTint
+        ]
+        navAppearance.doneButtonAppearance.normal.titleTextAttributes = [
+            .foregroundColor: navTint
+        ]
+        navAppearance.backButtonAppearance.normal.titleTextAttributes = [
+            .foregroundColor: navTint
         ]
 
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
-        UINavigationBar.appearance().tintColor = UIColor(AppTheme.Colors.accent)
+        UINavigationBar.appearance().tintColor = navTint
 
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
 
-        let selectedColor = UIColor(AppTheme.Colors.warmAmber)
+        let selectedColor = UIColor(AppTheme.Colors.DarkMode.accent)
         // Always dark tab bar (Copilot-style)
         tabBarAppearance.backgroundColor = UIColor(AppTheme.Colors.DarkMode.background)
         let normalColor = UIColor(AppTheme.Colors.DarkMode.textTertiary)
@@ -61,6 +69,10 @@ struct Runaway_iOSApp: App {
         tabBarAppearance.inlineLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
         tabBarAppearance.inlineLayoutAppearance.selected.iconColor = selectedColor
         tabBarAppearance.inlineLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
+        tabBarAppearance.compactInlineLayoutAppearance.normal.iconColor = normalColor
+        tabBarAppearance.compactInlineLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: normalColor]
+        tabBarAppearance.compactInlineLayoutAppearance.selected.iconColor = selectedColor
+        tabBarAppearance.compactInlineLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selectedColor]
 
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance

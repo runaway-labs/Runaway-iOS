@@ -126,7 +126,7 @@ struct AuthButton: View {
     private var backgroundColor: Color {
         switch style {
         case .primary:
-            return isEnabled ? AppTheme.Colors.accent : Color.gray.opacity(0.3)
+            return isEnabled ? AppTheme.Colors.strideLime : Color.gray.opacity(0.3)
         case .secondary:
             return Color.clear
         case .social:
@@ -139,7 +139,7 @@ struct AuthButton: View {
     private var foregroundColor: Color {
         switch style {
         case .primary:
-            return .white
+            return AppTheme.Colors.pine
         case .secondary:
             return AppTheme.Colors.accent
         case .social:
@@ -189,8 +189,6 @@ struct AuthButton: View {
                 RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium)
                     .stroke(borderColor, lineWidth: style == .secondary || style == .social ? 1.5 : 0)
             )
-            .shadow(color: style == .primary && isEnabled ? AppTheme.Colors.accent.opacity(0.3) : .clear,
-                    radius: 8, x: 0, y: 4)
         }
         .disabled(!isEnabled || isLoading)
         .animation(.easeInOut(duration: 0.2), value: isEnabled)

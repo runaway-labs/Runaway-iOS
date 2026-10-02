@@ -114,6 +114,7 @@ struct ActivityTypePickerSheet: View {
                     }
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -121,10 +122,12 @@ struct ActivityTypePickerSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.adaptiveTextSecondary)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .task {
             await loadActivityTypes()
         }

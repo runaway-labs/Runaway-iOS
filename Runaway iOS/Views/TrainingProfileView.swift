@@ -54,48 +54,54 @@ struct TrainingProfileView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .disabled(model.isRegenerating)
+                        .darkSurfaceTint()
                 }
             }
-            .confirmationDialog(
-                "When should your plan reflect this profile?",
-                isPresented: $model.isPresentingRegenerationChoices,
-                titleVisibility: .visible
-            ) {
-                Button("Update Next Week (Recommended)") {
-                    Task { await model.regenerate(scope: .nextWeek) }
-                }
-                Button(model.currentWeekActionTitle) {
-                    Task { await model.regenerate(scope: .remainingCurrentWeek) }
-                }
-                Button("Cancel", role: .cancel) {
-                    model.cancelRegeneration()
-                }
-            } message: {
-                Text("Your profile is saved. Completed workouts will stay protected.")
-            }
-            .alert(
-                "Plan Update Failed",
-                isPresented: Binding(
-                    get: { model.errorMessage != nil },
-                    set: { if !$0 { model.dismissError() } }
-                )
-            ) {
-                if model.canRetry {
-                    Button("Retry") {
-                        Task { await model.retry() }
+            .background {
+                Color.clear
+                    .confirmationDialog(
+                        "When should your plan reflect this profile?",
+                        isPresented: $model.isPresentingRegenerationChoices,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Update Next Week (Recommended)") {
+                            Task { await model.regenerate(scope: .nextWeek) }
+                        }
+                        Button(model.currentWeekActionTitle) {
+                            Task { await model.regenerate(scope: .remainingCurrentWeek) }
+                        }
+                        Button("Cancel", role: .cancel) {
+                            model.cancelRegeneration()
+                        }
+                    } message: {
+                        Text("Your profile is saved. Completed workouts will stay protected.")
                     }
-                }
-                Button("Not Now", role: .cancel) {
-                    model.dismissError()
-                }
-            } message: {
-                Text(model.errorMessage ?? "Your saved profile is safe and your previous plan is unchanged.")
+                    .alert(
+                        "Plan Update Failed",
+                        isPresented: Binding(
+                            get: { model.errorMessage != nil },
+                            set: { if !$0 { model.dismissError() } }
+                        )
+                    ) {
+                        if model.canRetry {
+                            Button("Retry") {
+                                Task { await model.retry() }
+                            }
+                        }
+                        Button("Not Now", role: .cancel) {
+                            model.dismissError()
+                        }
+                    } message: {
+                        Text(model.errorMessage ?? "Your saved profile is safe and your previous plan is unchanged.")
+                    }
+                    .adaptiveSurfaceTint()
             }
             .onChange(of: model.shouldDismiss) { _, shouldDismiss in
                 if shouldDismiss { dismiss() }
             }
             .interactiveDismissDisabled(model.isRegenerating)
         }
+        .darkSurfaceTint()
     }
 
     private var weeklyMixSummary: some View {
@@ -122,7 +128,7 @@ struct TrainingProfileView: View {
     private var validationRepairCard: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.md) {
             Image(systemName: "wand.and.stars")
-                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                .foregroundColor(AppTheme.Colors.infoBlueLight)
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                 Text("We’ll tidy this before saving")
@@ -136,11 +142,11 @@ struct TrainingProfileView: View {
         }
         .padding(AppTheme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.Colors.strideBlue.opacity(0.1))
+        .background(AppTheme.Colors.infoBlue.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium)
-                .stroke(AppTheme.Colors.strideBlue.opacity(0.24), lineWidth: 1)
+                .stroke(AppTheme.Colors.infoBlue.opacity(0.24), lineWidth: 1)
         )
     }
 
@@ -166,7 +172,7 @@ struct TrainingProfileView: View {
         VStack(spacing: AppTheme.Spacing.lg) {
             ProgressView()
                 .controlSize(.large)
-                .tint(AppTheme.Colors.warmAmber)
+                .tint(AppTheme.Colors.strideLime)
             Text("Updating your plan")
                 .font(AppTheme.Typography.title3)
                 .foregroundColor(AppTheme.Colors.textPrimary)

@@ -39,7 +39,7 @@ struct WeeklyStatsCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(String(format: stats.totalMiles >= 10 ? "%.1f" : "%.2f", stats.totalMiles))
                             .font(.system(size: 52, weight: .bold, design: .rounded))
-                            .foregroundColor(AppTheme.Colors.strideBlueLight)
+                            .foregroundColor(AppTheme.Colors.infoBlueLight)
                             .monospacedDigit()
                         Text(UnitFormatter.distanceUnitAbbreviation)
                             .font(.system(size: 20, weight: .medium, design: .rounded))
@@ -167,7 +167,7 @@ struct WeeklyStatsCard: View {
     }
 
     private var progressColor: Color {
-        progress >= 1.0 ? AppTheme.Colors.success : AppTheme.Colors.strideBlue
+        progress >= 1.0 ? AppTheme.Colors.success : AppTheme.Colors.infoBlue
     }
 }
 

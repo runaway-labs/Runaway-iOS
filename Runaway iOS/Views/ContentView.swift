@@ -105,9 +105,12 @@ private struct IntelligenceRequirementView: View {
                 if canRetry {
                     Button("Check Again", action: retry)
                         .font(AppTheme.Typography.headline)
+                        .foregroundStyle(AppTheme.Colors.pine)
                         .frame(minHeight: 44)
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppTheme.Colors.warmAmber)
+                        .padding(.horizontal, AppTheme.Spacing.xl)
+                        .background(AppTheme.Colors.strideLime)
+                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
+                        .buttonStyle(.plain)
                 }
             }
             .padding(AppTheme.Spacing.xl)
@@ -122,9 +125,9 @@ private struct SessionSetupErrorView: View {
 
     var body: some View {
         VStack(spacing: AppTheme.Spacing.lg) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(systemName: "exclamationmark.triangle.fill")
                 .font(.title)
-                .foregroundStyle(AppTheme.Colors.warmAmber)
+                .foregroundStyle(AppTheme.Colors.warning)
                 .accessibilityHidden(true)
             Text("Account setup paused")
                 .font(AppTheme.Typography.title)
@@ -133,8 +136,12 @@ private struct SessionSetupErrorView: View {
                 .multilineTextAlignment(.center)
             Button("Try Again", action: retry)
                 .font(AppTheme.Typography.headline)
+                .foregroundStyle(AppTheme.Colors.pine)
                 .frame(minHeight: 44)
-                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, AppTheme.Spacing.xl)
+                .background(AppTheme.Colors.strideLime)
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.large))
+                .buttonStyle(.plain)
                 .accessibilityHint("Retries secure account setup")
         }
         .padding(AppTheme.Spacing.xl)

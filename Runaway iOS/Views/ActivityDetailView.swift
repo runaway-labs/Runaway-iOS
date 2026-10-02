@@ -216,12 +216,17 @@ struct ActivityDetailView: View {
                 .accessibilityLabel("Close activity")
             }
         }
-        .alert("Delete Activity", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) { deleteActivity() }
-        } message: {
-            Text("Are you sure you want to delete \"\(activity.name ?? "this activity")\"? This action cannot be undone.")
+        .background {
+            Color.clear
+                .alert("Delete Activity", isPresented: $showDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) { deleteActivity() }
+                } message: {
+                    Text("Are you sure you want to delete \"\(activity.name ?? "this activity")\"? This action cannot be undone.")
+                }
+                .adaptiveSurfaceTint()
         }
+        .darkSurfaceTint()
         .overlay {
             if isDeleting {
                 Color.black.opacity(0.4).ignoresSafeArea()
@@ -345,7 +350,7 @@ struct ActivityDetailMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = UIColor(AppTheme.Colors.accent)
+                renderer.strokeColor = UIColor(AppTheme.Colors.warmAmber)
                 renderer.lineWidth = 5
                 renderer.lineCap = .round
                 renderer.lineJoin = .round

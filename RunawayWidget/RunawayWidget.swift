@@ -3,12 +3,14 @@ import SwiftUI
 import WidgetKit
 
 enum BecomingWidgetTheme {
-    static let background = Color(red: 0.02, green: 0.05, blue: 0.08)
-    static let surface = Color(red: 0.05, green: 0.11, blue: 0.15)
-    static let blue = Color(red: 0.20, green: 0.66, blue: 1)
+    static let background = RunawayPalette.nightPine
+    static let surface = RunawayPalette.backgroundElevated
+    static let lime = RunawayPalette.strideLime
+    static let pine = RunawayPalette.pine
+    static let blue = RunawayPalette.infoBlue
     static let mint = Color(red: 0.22, green: 0.86, blue: 0.65)
-    static let caution = Color(red: 1, green: 0.78, blue: 0.18)
-    static let secondary = Color.white.opacity(0.58)
+    static let caution = RunawayPalette.warning
+    static let secondary = RunawayPalette.textSecondary
 }
 
 struct BecomingWidgetPath: Identifiable {
@@ -167,8 +169,8 @@ struct RunawayWidgetEntryView: View {
                 Label("REVIEW", systemImage: "arrow.triangle.branch")
                     .font(.system(size: 8, weight: .black, design: .rounded))
                     .padding(.horizontal, 8).padding(.vertical, 5)
-                    .foregroundStyle(ProgressWidgetPalette.ink)
-                    .background(BecomingWidgetTheme.caution, in: Capsule())
+                    .foregroundStyle(BecomingWidgetTheme.pine)
+                    .background(BecomingWidgetTheme.lime, in: Capsule())
             }.buttonStyle(.plain)
         } else {
             Label("ADAPTED", systemImage: "checkmark")
@@ -201,8 +203,12 @@ struct RunawayWidgetEntryView: View {
             Text("Best path: \(entry.recommendedChoice.shortTitle.capitalized)").font(.system(size: 10, weight: .semibold, design: .rounded)).foregroundStyle(BecomingWidgetTheme.mint).lineLimit(1)
             Spacer(minLength: 0)
             Button(intent: ChooseBecomingPathIntent(choice: entry.recommendedChoice)) {
-                Label("Choose", systemImage: entry.recommendedChoice.icon).font(.system(size: 11, weight: .bold, design: .rounded)).frame(maxWidth: .infinity, minHeight: 30)
-            }.buttonStyle(.plain).tint(BecomingWidgetTheme.mint)
+                Label("Choose", systemImage: entry.recommendedChoice.icon)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(BecomingWidgetTheme.pine)
+                    .frame(maxWidth: .infinity, minHeight: 30)
+                    .background(BecomingWidgetTheme.lime, in: RoundedRectangle(cornerRadius: 10))
+            }.buttonStyle(.plain)
         }.padding(14)
     }
     private var medium: some View {
@@ -237,16 +243,16 @@ struct RunawayWidgetEntryView: View {
             ForEach(entry.paths) { path in
                 Button(intent: ChooseBecomingPathIntent(choice: path.choice)) {
                     HStack(spacing: 10) {
-                        Image(systemName: path.choice.icon).frame(width: 20)
+                        Image(systemName: path.choice.icon).frame(width: 20).widgetAccentable()
                         VStack(alignment: .leading, spacing: 2) {
                             Text(path.title).font(.system(size: 13, weight: .bold, design: .rounded))
-                            Text(path.effect).font(.system(size: 9, design: .rounded)).foregroundStyle(BecomingWidgetTheme.secondary).lineLimit(1)
+                            Text(path.effect).font(.system(size: 9, design: .rounded)).lineLimit(1)
                         }
                         Spacer()
-                        if path.recommended { Text("BEST").font(.system(size: 8, weight: .black, design: .rounded)).foregroundStyle(BecomingWidgetTheme.mint) }
+                        if path.recommended { Text("BEST").font(.system(size: 8, weight: .black, design: .rounded)) }
                         Image(systemName: entry.selectedChoice == path.choice ? "checkmark.circle.fill" : "chevron.right")
-                    }.foregroundStyle(.white).padding(.horizontal, 11).padding(.vertical, 8)
-                        .background(path.recommended ? BecomingWidgetTheme.mint.opacity(0.1) : BecomingWidgetTheme.surface.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                    }.foregroundStyle(BecomingWidgetTheme.pine).padding(.horizontal, 11).padding(.vertical, 8)
+                        .background(BecomingWidgetTheme.lime, in: RoundedRectangle(cornerRadius: 12))
                 }.buttonStyle(.plain)
             }
             Spacer(minLength: 0)
@@ -258,9 +264,12 @@ struct RunawayWidgetEntryView: View {
             ForEach(entry.paths) { path in
                 Button(intent: ChooseBecomingPathIntent(choice: path.choice)) {
                     VStack(spacing: 4) {
-                        Circle().fill(path.recommended ? BecomingWidgetTheme.mint : BecomingWidgetTheme.blue.opacity(0.4)).frame(width: path.recommended ? 10 : 7, height: path.recommended ? 10 : 7)
-                        Text(path.choice.shortTitle).font(.system(size: 7, weight: .bold, design: .rounded)).foregroundStyle(path.recommended ? .white : BecomingWidgetTheme.secondary)
-                    }.frame(maxWidth: .infinity, minHeight: 38).background(path.recommended ? BecomingWidgetTheme.mint.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                        Image(systemName: path.choice.icon).font(.system(size: 11, weight: .bold)).widgetAccentable()
+                        Text(path.choice.shortTitle).font(.system(size: 7, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(BecomingWidgetTheme.pine)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(BecomingWidgetTheme.lime, in: RoundedRectangle(cornerRadius: 9))
                 }.buttonStyle(.plain)
             }
         }
@@ -295,7 +304,7 @@ struct RunawayWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: ConfigurationAppIntent.self, provider: BecomingWidgetProvider()) { entry in
             RunawayWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    LinearGradient(colors: [ProgressWidgetPalette.ink, Color(red: 0.055, green: 0.105, blue: 0.15)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    RunawayPalette.nightPine
                 }
                 .widgetURL(entry.coach.map { URL(string: "runaway://coach/\($0.decisionID.uuidString)")! } ?? URL(string: "runaway://today"))
         }

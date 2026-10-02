@@ -77,7 +77,7 @@ struct PlanView: View {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { showingTrainingGuidelines = true } label: {
                     Image(systemName: "info.circle")
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
                 }
             }
         }
@@ -118,6 +118,7 @@ struct PlanView: View {
             viewModel.currentPlan = dataManager.currentWeeklyPlan
             viewModel.displayedPlan = dataManager.currentWeeklyPlan
         }
+        .darkSurfaceTint()
     }
 
     // MARK: - Load
@@ -250,7 +251,7 @@ struct PlanView: View {
 
                 if isLoadingGoals && allGoals.isEmpty {
                     ProgressView()
-                        .tint(AppTheme.Colors.accent)
+                        .tint(AppTheme.Colors.DarkMode.accent)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, AppTheme.Spacing.xxl)
                 } else if upcomingRaces.isEmpty {
@@ -264,7 +265,7 @@ struct PlanView: View {
                     Button { showingManualRace = true } label: {
                         Label("Add another race", systemImage: "plus.circle.fill")
                             .font(AppTheme.Typography.subheadline)
-                            .foregroundColor(AppTheme.Colors.accent)
+                            .foregroundColor(AppTheme.Colors.DarkMode.accent)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, AppTheme.Spacing.sm)
                     }
@@ -340,7 +341,7 @@ struct RaceCarousel: View {
                 HStack(spacing: 6) {
                     ForEach(0..<races.count, id: \.self) { i in
                         Capsule()
-                            .fill(i == currentIndex ? AppTheme.Colors.accent : Color.white.opacity(0.2))
+                            .fill(i == currentIndex ? AppTheme.Colors.DarkMode.accent : Color.white.opacity(0.2))
                             .frame(width: i == currentIndex ? 18 : 6, height: 6)
                             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: currentIndex)
                             .onTapGesture { currentIndex = i }
@@ -377,7 +378,7 @@ struct NextRaceCard: View {
     private var urgencyColor: Color {
         if daysUntil == 0  { return .red }
         if daysUntil <= 7  { return .orange }
-        return AppTheme.Colors.accent
+        return AppTheme.Colors.DarkMode.accent
     }
 
     private var cardLabel: String {
@@ -435,17 +436,28 @@ struct NextRaceCard: View {
                         .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
 
                     if race.runsignupRaceId != nil {
-                        Button { showingCourseRecon = true } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "mountain.2.fill")
-                                Text("Scout Course")
+                        HStack(spacing: 8) {
+                            Button { showingCourseRecon = true } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "mountain.2.fill")
+                                    Text("Scout Course")
+                                }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(AppTheme.Colors.pine)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(AppTheme.Colors.strideLime)
+                                .cornerRadius(20)
                             }
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(urgencyColor)
-                            .cornerRadius(20)
+                            .buttonStyle(.plain)
+                            if daysUntil <= 7 {
+                                Label(
+                                    daysUntil == 0 ? "Race day" : "Race week",
+                                    systemImage: "exclamationmark.triangle.fill"
+                                )
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(daysUntil == 0 ? Color.red : AppTheme.Colors.DarkMode.warning)
+                            }
                         }
                         .padding(.top, 8)
                     }
@@ -490,7 +502,7 @@ struct NextRaceCard: View {
             if let raceWeather {
                 HStack(spacing: 8) {
                     Image(systemName: raceWeather.symbolName)
-                        .foregroundColor(AppTheme.Colors.strideBlueLight)
+                        .foregroundColor(AppTheme.Colors.infoBlueLight)
                     Text("Race-day outlook")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
@@ -536,7 +548,7 @@ struct NoRaceCard: View {
         VStack(spacing: 12) {
             Image(systemName: "flag.checkered.2.crossed")
                 .font(.system(size: 36))
-                .foregroundColor(AppTheme.Colors.accent.opacity(0.7))
+                .foregroundColor(AppTheme.Colors.DarkMode.accent.opacity(0.7))
             Text("No upcoming race set")
                 .font(AppTheme.Typography.headline)
                 .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
@@ -549,9 +561,10 @@ struct NoRaceCard: View {
                     .font(AppTheme.Typography.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppTheme.Colors.strideBlue)
-            .foregroundStyle(Color.white)
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
             .padding(.top, 4)
         }
         .padding(24)
@@ -628,10 +641,10 @@ struct PlanHeaderCard: View {
                     if let focus = plan.focusArea {
                         Text(focus)
                             .font(AppTheme.Typography.caption)
-                            .foregroundColor(AppTheme.Colors.accent)
+                            .foregroundColor(AppTheme.Colors.DarkMode.accent)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(AppTheme.Colors.accent.opacity(0.1))
+                            .background(AppTheme.Colors.DarkMode.accent.opacity(0.1))
                             .cornerRadius(4)
                     }
                 }
@@ -644,7 +657,7 @@ struct PlanHeaderCard: View {
                             .font(.system(size: 16, weight: .medium))
                     }
                 }
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
                 .disabled(isRegenerating)
                 .frame(minWidth: 44, minHeight: 44)
                 .accessibilityLabel("Regenerate remaining training plan")
@@ -679,7 +692,7 @@ struct PlanStatItem: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 16))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
             Text(value)
                 .font(AppTheme.Typography.headline)
                 .foregroundColor(valueColor)
@@ -729,7 +742,7 @@ struct PlanWeekDayRow: View {
             HStack(spacing: AppTheme.Spacing.md) {
                 Text(entry.dayOfWeek.shortName)
                     .font(AppTheme.Typography.caption)
-                    .foregroundColor(entry.isToday ? AppTheme.Colors.accent : AppTheme.Colors.DarkMode.textSecondary)
+                    .foregroundColor(entry.isToday ? AppTheme.Colors.DarkMode.accent : AppTheme.Colors.DarkMode.textSecondary)
                     .frame(width: 35, alignment: .leading)
                 Image(systemName: entry.icon)
                     .font(.system(size: 16))
@@ -750,7 +763,7 @@ struct PlanWeekDayRow: View {
             }
             .padding(.vertical, AppTheme.Spacing.sm)
             .padding(.horizontal, AppTheme.Spacing.sm)
-            .background(entry.isToday ? AppTheme.Colors.accent.opacity(0.05) : Color.clear)
+            .background(entry.isToday ? AppTheme.Colors.DarkMode.accent.opacity(0.05) : Color.clear)
             .cornerRadius(8)
             .contentShape(Rectangle())
         }
@@ -767,7 +780,7 @@ struct AdaptiveInsightsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack {
-                Image(systemName: "brain").foregroundColor(AppTheme.Colors.accent)
+                Image(systemName: "brain").foregroundColor(AppTheme.Colors.DarkMode.accent)
                 Text("Adaptive Insights").font(AppTheme.Typography.headline)
                     .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
             }
@@ -809,7 +822,7 @@ struct BaselineTransparencyCard: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             Button(action: { withAnimation { isExpanded.toggle() } }) {
                 HStack {
-                    Image(systemName: "chart.line.uptrend.xyaxis").foregroundColor(AppTheme.Colors.accent)
+                    Image(systemName: "chart.line.uptrend.xyaxis").foregroundColor(AppTheme.Colors.DarkMode.accent)
                     Text("Your Training Baseline").font(AppTheme.Typography.headline)
                         .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
                     Spacer()
@@ -875,7 +888,7 @@ struct BaselineStatPill: View {
     let label: String; let value: String; let icon: String
     var body: some View {
         VStack(spacing: 4) {
-            Image(systemName: icon).font(.system(size: 14)).foregroundColor(AppTheme.Colors.accent)
+            Image(systemName: icon).font(.system(size: 14)).foregroundColor(AppTheme.Colors.DarkMode.accent)
             Text(value).font(AppTheme.Typography.subheadline).fontWeight(.semibold)
                 .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
             Text(label).font(.system(size: 10))
@@ -889,7 +902,7 @@ struct BaselineExplanationRow: View {
     let text: String
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-            Image(systemName: "info.circle").font(.system(size: 12)).foregroundColor(AppTheme.Colors.accent)
+            Image(systemName: "info.circle").font(.system(size: 12)).foregroundColor(AppTheme.Colors.DarkMode.accent)
             Text(text).font(AppTheme.Typography.caption)
                 .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
         }
@@ -904,7 +917,7 @@ struct TrainingPrinciplesCard: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             Button(action: { withAnimation { isExpanded.toggle() } }) {
                 HStack {
-                    Image(systemName: "book.fill").foregroundColor(AppTheme.Colors.accent)
+                    Image(systemName: "book.fill").foregroundColor(AppTheme.Colors.DarkMode.accent)
                     Text("Training Science").font(AppTheme.Typography.headline)
                         .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
                     Spacer()
@@ -938,7 +951,7 @@ struct PrincipleRow: View {
     let icon: String; let title: String; let description: String
     var body: some View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.sm) {
-            Image(systemName: icon).foregroundColor(AppTheme.Colors.accent).frame(width: 24)
+            Image(systemName: icon).foregroundColor(AppTheme.Colors.DarkMode.accent).frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(AppTheme.Typography.subheadline)
                     .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
@@ -959,7 +972,7 @@ struct NoPlanView: View {
         VStack(spacing: AppTheme.Spacing.xl) {
             Spacer()
             Image(systemName: "calendar.badge.plus").font(.system(size: 80))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
             VStack(spacing: AppTheme.Spacing.sm) {
                 Text("No Training Plan").font(AppTheme.Typography.title)
                     .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
@@ -984,7 +997,7 @@ struct NoPlanView: View {
                     }
                 }
                 .padding()
-                .background(AppTheme.Colors.accent.opacity(0.05))
+                .background(AppTheme.Colors.DarkMode.accent.opacity(0.05))
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
             Button(action: onGenerate) {
@@ -997,10 +1010,10 @@ struct NoPlanView: View {
                     Text(isGenerating ? "Generating..." : "Generate Plan")
                 }
                 .font(AppTheme.Typography.headline)
-                .foregroundColor(.black)
+                .foregroundColor(AppTheme.Colors.pine)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
             .disabled(isGenerating)
@@ -1014,7 +1027,7 @@ struct LoadingPlanView: View {
     var body: some View {
         VStack(spacing: AppTheme.Spacing.lg) {
             ProgressView().scaleEffect(1.5)
-                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.accent))
+                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.DarkMode.accent))
             Text("Loading your plan...").font(AppTheme.Typography.body)
                 .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
         }
@@ -1079,8 +1092,14 @@ struct TrainingGuidelinesSheet: View {
             .background(AppTheme.Colors.DarkMode.background)
             .navigationTitle("Training Guidelines")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .darkSurfaceTint()
+                }
+            }
         }
+        .darkSurfaceTint()
     }
 }
 
@@ -1090,7 +1109,7 @@ struct GuidelinesSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             HStack(spacing: AppTheme.Spacing.sm) {
-                Image(systemName: icon).foregroundColor(AppTheme.Colors.accent).font(.system(size: 18))
+                Image(systemName: icon).foregroundColor(AppTheme.Colors.DarkMode.accent).font(.system(size: 18))
                 Text(title).font(AppTheme.Typography.headline)
                     .foregroundColor(AppTheme.Colors.DarkMode.textPrimary)
             }

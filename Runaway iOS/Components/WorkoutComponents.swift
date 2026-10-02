@@ -176,7 +176,7 @@ struct TodaysFocusCard: View {
         case .runningPrimary:
             return AppTheme.Colors.warmAmber
         case .aerobic:
-            return AppTheme.Colors.strideBlue
+            return AppTheme.Colors.infoBlue
         case .recovery:
             return AppTheme.Colors.recoveryMint
         case .workout(let workoutType):
@@ -530,8 +530,8 @@ struct TodaysFocusCard: View {
                             .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.black)
-                    .background(TrainingProgressStyle.amber, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(AppTheme.Colors.pine)
+                    .background(AppTheme.Colors.strideLime, in: RoundedRectangle(cornerRadius: 14))
                     .accessibilityIdentifier("performanceCoachPrimaryAction")
 
                     Button { presentDailyDecision(showChoices: true) } label: {
@@ -652,22 +652,28 @@ struct TodaysFocusCard: View {
                         }
                         .padding()
                     }
+                    .adaptiveSurfaceTint()
                     .navigationTitle("Today's guidance")
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { showingWorkoutDetails = false }
+                                .darkSurfaceTint()
                         }
                     }
                 }
             }
         }
-        .alert("Plan update failed", isPresented: Binding(
-            get: { adjustmentErrorMessage != nil },
-            set: { if !$0 { adjustmentErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
-        } message: {
-            Text(adjustmentErrorMessage ?? "Please try again.")
+        .background {
+            Color.clear
+                .alert("Plan update failed", isPresented: Binding(
+                    get: { adjustmentErrorMessage != nil },
+                    set: { if !$0 { adjustmentErrorMessage = nil } }
+                )) {
+                    Button("OK", role: .cancel) { adjustmentErrorMessage = nil }
+                } message: {
+                    Text(adjustmentErrorMessage ?? "Please try again.")
+                }
+                .adaptiveSurfaceTint()
         }
     }
 
@@ -1054,9 +1060,11 @@ private struct TrainingDecisionSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .presentationDetents([.medium, .large])
         .sheet(isPresented: $showingTrainingProfile) {
             TrainingProfileView(route: TrainingProfileRoute(store: trainingProfileStore))
@@ -1080,8 +1088,8 @@ private struct TrainingDecisionSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.plain)
-            .foregroundColor(.white)
-            .background(AppTheme.Colors.warmAmber)
+            .foregroundColor(AppTheme.Colors.pine)
+            .background(AppTheme.Colors.strideLime)
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         }
         .padding(14)

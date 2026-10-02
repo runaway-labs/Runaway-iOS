@@ -126,14 +126,23 @@ struct TrainingSessionResultView: View {
             }
             .navigationTitle(existingResult == nil ? "Record completed work" : "Edit completed work")
             .navigationBarTitleDisplayMode(.inline)
-            .tint(AppTheme.Colors.strideBlue)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .tint(AppTheme.Colors.infoBlue)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .darkSurfaceTint()
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .trainingSessionInvalidated)) { _ in dismiss() }
-            .alert(saved ? "Session saved" : "Could not save", isPresented: Binding(
-                get: { alertText != nil }, set: { if !$0 { alertText = nil } }
-            )) {
-                Button("OK") { if saved { dismiss() } }
-            } message: { Text(alertText ?? "") }
+            .background {
+                Color.clear
+                    .alert(saved ? "Session saved" : "Could not save", isPresented: Binding(
+                        get: { alertText != nil }, set: { if !$0 { alertText = nil } }
+                    )) {
+                        Button("OK") { if saved { dismiss() } }
+                    } message: { Text(alertText ?? "") }
+                    .adaptiveSurfaceTint()
+            }
         }
     }
 

@@ -169,11 +169,11 @@ struct NoCommitmentView: View {
                     Text("Set Commitment")
                         .font(AppTheme.Typography.body)
                         .fontWeight(.semibold)
-                        .foregroundColor(.black)
+                        .foregroundColor(AppTheme.Colors.pine)
                     Spacer()
                 }
                 .padding(.vertical, AppTheme.Spacing.sm)
-                .background(AppTheme.Colors.accent)
+                .background(AppTheme.Colors.strideLime)
                 .cornerRadius(AppTheme.CornerRadius.small)
             }
 
@@ -250,10 +250,10 @@ struct ActiveCommitmentView: View {
                 Text("Active")
                     .font(AppTheme.Typography.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
                     .padding(.horizontal, AppTheme.Spacing.sm)
                     .padding(.vertical, 2)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.small)
             }
 
@@ -345,13 +345,17 @@ struct ActiveCommitmentView: View {
                 onSave: updateCommitment
             )
         }
-        .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Remove", role: .destructive) {
-                deleteCommitment()
-            }
-        } message: {
-            Text("Are you sure you want to remove today's commitment? You can set a new one afterward.")
+        .background {
+            Color.clear
+                .alert("Remove Commitment?", isPresented: $showingDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Remove", role: .destructive) {
+                        deleteCommitment()
+                    }
+                } message: {
+                    Text("Are you sure you want to remove today's commitment? You can set a new one afterward.")
+                }
+                .adaptiveSurfaceTint()
         }
         .onChange(of: dataManager.todaysCommitment?.activityType) { _, newType in
             // Sync selectedActivityType when commitment changes externally
@@ -633,11 +637,11 @@ struct EditCommitmentSheet: View {
                         Text("Save Changes")
                             .font(AppTheme.Typography.body)
                             .fontWeight(.semibold)
-                            .foregroundColor(.black)
+                            .foregroundColor(AppTheme.Colors.pine)
                         Spacer()
                     }
                     .padding(.vertical, AppTheme.Spacing.md)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.medium)
                 }
                 .disabled(selectedType == currentType)
@@ -645,9 +649,11 @@ struct EditCommitmentSheet: View {
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.bottom, AppTheme.Spacing.lg)
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Edit Commitment")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -655,10 +661,12 @@ struct EditCommitmentSheet: View {
                         selectedType = currentType
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.adaptiveTextSecondary)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
         .task {
             await loadActivityTypes()
         }

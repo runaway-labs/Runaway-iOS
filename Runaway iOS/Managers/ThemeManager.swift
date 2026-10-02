@@ -100,7 +100,8 @@ struct DynamicColors {
         themeManager.isDarkMode ? AppTheme.Colors.DarkMode.textTertiary : AppTheme.Colors.LightMode.textTertiary
     }
 
-    // MARK: - Accent (same for both modes)
+    // MARK: - Accent
+    // Same adaptive token as AppTheme.Colors.accent: lime in dark, moss in light.
     var accent: Color {
         AppTheme.Colors.accent
     }

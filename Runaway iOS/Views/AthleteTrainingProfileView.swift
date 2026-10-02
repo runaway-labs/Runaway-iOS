@@ -97,7 +97,10 @@ struct AthleteTrainingProfileView: View {
             .navigationTitle("Training Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                        .darkSurfaceTint()
+                }
             }
             .task { model.load() }
             .onReceive(NotificationCenter.default.publisher(for: .trainingSessionInvalidated)) { _ in
@@ -121,16 +124,20 @@ struct AthleteTrainingProfileView: View {
             .sheet(item: $sessionPreview) { snapshot in
                 CompleteGoalSessionPreviewView(snapshot: snapshot).safeAreaInset(edge: .bottom) { GoalDailyShadowComparisonEntry(snapshot: snapshot) }
             }
-            .alert("Cannot preview yet", isPresented: Binding(
-                get: { previewError != nil }, set: { if !$0 { previewError = nil } })) {
-                Button("OK", role: .cancel) { previewError = nil }
-            } message: {
-                Text(previewError ?? "Save your profile and try again.")
-            }
-            .confirmationDialog("Import completed runs?", isPresented: $confirmingImport, titleVisibility: .visible) {
-                Button("Import loaded runs") { model.importRuns(dataManager.activities) }
-            } message: {
-                Text("Uses activities currently loaded for this account. Walks, planned sessions, missing measurements, and unowned records are excluded. Existing corrections are preserved. This saves evidence immediately.")
+            .background {
+                Color.clear
+                    .alert("Cannot preview yet", isPresented: Binding(
+                        get: { previewError != nil }, set: { if !$0 { previewError = nil } })) {
+                        Button("OK", role: .cancel) { previewError = nil }
+                    } message: {
+                        Text(previewError ?? "Save your profile and try again.")
+                    }
+                    .confirmationDialog("Import completed runs?", isPresented: $confirmingImport, titleVisibility: .visible) {
+                        Button("Import loaded runs") { model.importRuns(dataManager.activities) }
+                    } message: {
+                        Text("Uses activities currently loaded for this account. Walks, planned sessions, missing measurements, and unowned records are excluded. Existing corrections are preserved. This saves evidence immediately.")
+                    }
+                    .adaptiveSurfaceTint()
             }
         }
     }

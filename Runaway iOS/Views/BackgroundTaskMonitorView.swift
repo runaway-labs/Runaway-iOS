@@ -49,6 +49,7 @@ struct BackgroundTaskMonitorView: View {
         .sheet(isPresented: $showingDetails) {
             BackgroundTaskDetailsView()
         }
+        .adaptiveSurfaceTint()
         #if DEBUG
         .task {
             guard let athleteID = UserSession.shared.userId else { return }
@@ -87,7 +88,10 @@ struct BackgroundTaskMonitorView: View {
             if let state = athleteStateService.snapshot {
                 comparisonRow("State", "\(state.recoveryDirection.rawValue) · \(state.intensityCap.rawValue)")
                 comparisonRow("Missing", state.missingSignals.isEmpty ? "None" : state.missingSignals.joined(separator: ", "))
-                Text(state.isStale() ? "State is stale; last-known-good remains visible." : "State is current.")
+                Label(
+                    state.isStale() ? "State is stale; last-known-good remains visible." : "State is current.",
+                    systemImage: state.isStale() ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+                )
                     .font(AppTheme.Typography.caption)
                     .foregroundStyle(state.isStale() ? AppTheme.Colors.warning : AppTheme.Colors.success)
             }
@@ -227,8 +231,8 @@ struct BackgroundTaskMonitorView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(AppTheme.Colors.accent)
-                .foregroundColor(.black)
+                .background(AppTheme.Colors.strideLime)
+                .foregroundColor(AppTheme.Colors.pine)
                 .cornerRadius(AppTheme.CornerRadius.medium)
             }
 
@@ -417,18 +421,22 @@ struct BackgroundTaskDetailsView: View {
                 }
                 .padding()
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Background Task Details")
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
     
     private var backgroundAppRefreshStatus: String {

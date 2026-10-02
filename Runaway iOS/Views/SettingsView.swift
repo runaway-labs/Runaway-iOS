@@ -81,9 +81,11 @@ struct SettingsView: View {
                 .padding(AppTheme.Spacing.md)
             }
         }
+        .adaptiveSurfaceTint()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(themeManager.isDarkMode ? .dark : .light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
             .sheet(isPresented: $showingStravaSheet) {
@@ -103,6 +105,8 @@ struct SettingsView: View {
                     CoachActivityView(athleteID: athleteID)
                 } else {
                     ContentUnavailableView("Sign in required", systemImage: "lock")
+                        .adaptiveSurfaceTint()
+                        .darkSurfaceTint()
                 }
             }
             .sheet(isPresented: $showingAthleteTrainingProfile) {
@@ -115,25 +119,29 @@ struct SettingsView: View {
                     StrengthRecommendationSettingsView(athleteID: athleteID)
                 }
             }
-            .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Disconnect", role: .destructive) {
-                    Task {
-                        await disconnectFromStrava()
+            .background {
+                Color.clear
+                    .alert("Disconnect from Strava", isPresented: $showingDisconnectAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Disconnect", role: .destructive) {
+                            Task {
+                                await disconnectFromStrava()
+                            }
+                        }
+                    } message: {
+                        Text("Are you sure you want to disconnect from Strava? Your activities will no longer sync automatically.")
                     }
-                }
-            } message: {
-                Text("Are you sure you want to disconnect from Strava? Your activities will no longer sync automatically.")
-            }
-            .alert("Disconnect from Garmin", isPresented: $showingGarminDisconnectAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Disconnect", role: .destructive) {
-                    Task {
-                        await disconnectFromGarmin()
+                    .alert("Disconnect from Garmin", isPresented: $showingGarminDisconnectAlert) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Disconnect", role: .destructive) {
+                            Task {
+                                await disconnectFromGarmin()
+                            }
+                        }
+                    } message: {
+                        Text("Are you sure you want to disconnect from Garmin Connect?")
                     }
-                }
-            } message: {
-                Text("Are you sure you want to disconnect from Garmin Connect?")
+                    .adaptiveSurfaceTint()
             }
             .task {
                 await stravaService.checkConnectionStatus()
@@ -143,6 +151,7 @@ struct SettingsView: View {
                     await stravaService.checkConnectionStatus()
                 }
             }
+            .darkSurfaceTint()
     }
 
     // MARK: - View Components
@@ -401,15 +410,19 @@ struct SettingsView: View {
                     .padding(.horizontal)
             }
         }
-        .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                Task {
-                    await deleteAccount()
+        .background {
+            Color.clear
+                .alert("Delete Account", isPresented: $showingDeleteAccountAlert) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await deleteAccount()
+                        }
+                    }
+                } message: {
+                    Text("Are you sure you want to permanently delete your account? This action cannot be undone. All your activities, training plans, and data will be permanently removed.")
                 }
-            }
-        } message: {
-            Text("Are you sure you want to permanently delete your account? This action cannot be undone. All your activities, training plans, and data will be permanently removed.")
+                .adaptiveSurfaceTint()
         }
     }
 
@@ -660,7 +673,7 @@ struct StravaConnectSheet: View {
                         HStack {
                             if isLoading {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(AppTheme.Colors.pine)
                             } else {
                                 Image(systemName: "bolt.fill")
                                 Text("Connect with Strava")
@@ -668,8 +681,8 @@ struct StravaConnectSheet: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange)
-                        .foregroundColor(.white)
+                        .background(AppTheme.Colors.strideLime)
+                        .foregroundColor(AppTheme.Colors.pine)
                         .cornerRadius(AppTheme.Spacing.md)
                     }
                     .disabled(isLoading)
@@ -677,19 +690,23 @@ struct StravaConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Strava Integration")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     private func connectToStrava() async {
@@ -1145,19 +1162,23 @@ struct GarminConnectSheet: View {
                     .padding(.bottom, AppTheme.Spacing.lg)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Garmin Integration")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     private func connectToGarmin() async {
@@ -1368,7 +1389,7 @@ struct AudioCoachingRow: View {
                     }
                 ))
                 .labelsHidden()
-                .tint(AppTheme.Colors.accent)
+                .adaptiveSurfaceTint()
             }
 
             if isEnabled {

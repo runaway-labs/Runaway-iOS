@@ -86,6 +86,7 @@ struct ActivitiesView: View {
         .onChange(of: progress.weekActivities) { _, _ in applyFilter() }
         .refreshable { await refresh() }
         .sheet(item: $selectedActivity) { activity in NavigationStack { ActivityDetailView(activity: activity) } }
+        .darkSurfaceTint()
     }
 
     private var summaryCard: some View {
@@ -151,7 +152,7 @@ struct EmptyActivitiesView: View {
         VStack(spacing: AppTheme.Spacing.lg) {
             Image(systemName: "figure.run.circle")
                 .font(.system(size: 80))
-                .foregroundColor(AppTheme.Colors.accent)
+                .foregroundColor(AppTheme.Colors.DarkMode.accent)
 
             VStack(spacing: AppTheme.Spacing.sm) {
                 Text("No Activities Yet")

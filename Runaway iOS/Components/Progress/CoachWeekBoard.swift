@@ -188,8 +188,8 @@ struct CoachWeekBoard: View {
                 .padding(.horizontal, action == .commit ? 14 : 4)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(action == .commit ? Color.black : TrainingProgressStyle.blue)
-        .background(action == .commit ? TrainingProgressStyle.amber : Color.clear,
+        .foregroundStyle(action == .commit ? AppTheme.Colors.pine : TrainingProgressStyle.blue)
+        .background(action == .commit ? AppTheme.Colors.strideLime : Color.clear,
                     in: RoundedRectangle(cornerRadius: 12))
     }
 

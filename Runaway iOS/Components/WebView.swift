@@ -159,7 +159,12 @@ struct ArticleWebView: View {
                             Button("Retry") {
                                 retryLoading()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.plain)
+                            .foregroundStyle(AppTheme.Colors.pine)
+                            .padding(.horizontal, AppTheme.Spacing.md)
+                            .padding(.vertical, AppTheme.Spacing.sm)
+                            .background(AppTheme.Colors.strideLime)
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                             
                             Button("Open in Safari") {
                                 openInSafari()
@@ -214,9 +219,11 @@ struct ArticleWebView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle(article.source)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onDisappear {
                 cancelTimeout()
@@ -226,7 +233,8 @@ struct ArticleWebView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(AppTheme.Colors.accent)
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -235,22 +243,26 @@ struct ArticleWebView: View {
                             Image(systemName: "chevron.left")
                         }
                         .disabled(!canGoBack)
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
 
                         Button(action: goForward) {
                             Image(systemName: "chevron.right")
                         }
                         .disabled(!canGoForward)
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
 
                         Button(action: openInSafari) {
                             Image(systemName: "safari")
                         }
-                        .foregroundColor(AppTheme.Colors.accent)
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
                     }
                 }
             }
         }
+        .darkSurfaceTint()
     }
     
     private func goBack() {

@@ -442,15 +442,19 @@ struct GoalInputSheet: View {
                     }
                 }
             }
+            .adaptiveSurfaceTint()
             .navigationTitle(currentGoal == nil ? "Set Running Goal" : "Edit Goal")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.light, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(AppTheme.Colors.DarkMode.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         presentationMode.wrappedValue.dismiss()
                     }
+                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                    .darkSurfaceTint()
                     .disabled(isSaving)
                 }
                 
@@ -458,15 +462,19 @@ struct GoalInputSheet: View {
                     if isSaving {
                         ProgressView()
                             .scaleEffect(0.8)
+                            .darkSurfaceTint()
                     } else {
                         Button("Save") {
                             saveGoal()
                         }
+                        .foregroundColor(AppTheme.Colors.DarkMode.accent)
+                        .darkSurfaceTint()
                         .disabled(!isValidInput)
                     }
                 }
             }
         }
+        .darkSurfaceTint()
         .onAppear {
             loadCurrentGoal()
         }

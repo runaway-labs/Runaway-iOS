@@ -101,6 +101,7 @@ struct CircularCountdownView: View {
             } else {
                 Image(systemName: entry.phaseIcon ?? "figure.run")
                     .font(.title2)
+                    .widgetAccentable()
             }
         }
     }
@@ -116,6 +117,7 @@ struct RectangularCountdownView: View {
             HStack(spacing: 4) {
                 Image(systemName: entry.phaseIcon ?? "figure.run")
                     .font(.caption)
+                    .widgetAccentable()
                 Text(entry.raceName ?? "Next Race")
                     .font(.caption)
                     .fontWeight(.bold)
@@ -150,7 +152,7 @@ struct InlineCountdownView: View {
 
     var body: some View {
         HStack {
-            Image(systemName: entry.phaseIcon ?? "figure.run")
+            Image(systemName: entry.phaseIcon ?? "figure.run").widgetAccentable()
             if let days = entry.daysUntilRace {
                 Text("\(days) days to \(entry.raceName ?? "Race")")
             } else {
@@ -170,7 +172,7 @@ struct SmallCountdownView: View {
             HStack {
                 Image(systemName: entry.phaseIcon ?? "figure.run")
                     .font(.title3)
-                    .foregroundColor(.orange)
+                    .widgetAccentable()
                 Spacer()
                 Text("Runaway")
                     .font(.system(size: 14, weight: .heavy))
@@ -184,7 +186,7 @@ struct SmallCountdownView: View {
                         .foregroundColor(.white)
                     Text("DAYS UNTIL RACE")
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(RunawayPalette.strideLime)
                 }
             } else {
                 Text(entry.phaseName ?? "Training Steady")
@@ -203,7 +205,7 @@ struct SmallCountdownView: View {
         }
         .padding()
         .containerBackground(for: .widget) {
-            Color(red: 0.031, green: 0.039, blue: 0.055)
+            RunawayPalette.nightPine
         }
     }
 }

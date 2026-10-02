@@ -23,7 +23,12 @@ struct AcceptedWorkoutCompletionPanel: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     Button("Record completed workout") { showingRecorder = true }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(AppTheme.Colors.pine)
+                        .padding(.horizontal, AppTheme.Spacing.lg)
+                        .padding(.vertical, AppTheme.Spacing.sm)
+                        .background(AppTheme.Colors.strideLime)
+                        .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
                         .accessibilityIdentifier("recordAcceptedWorkout")
                     Text("Review actual time, reps, load and effort against this exact prescription. Saving contributes evidence for your next proposal; it does not automatically rewrite the week.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -42,7 +47,7 @@ struct AcceptedWorkoutCompletionPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
-        .tint(AppTheme.Colors.strideBlue)
+        .tint(AppTheme.Colors.infoBlue)
         .task { reload() }
         .onReceive(NotificationCenter.default.publisher(for: .trainingSessionInvalidated)) { _ in
             reference = nil; showingRecorder = false; showingHistory = false

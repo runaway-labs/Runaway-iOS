@@ -370,6 +370,7 @@ struct ReadinessDetailView: View {
                 }
                 .padding(.bottom, 40)
             }
+            .adaptiveSurfaceTint()
             .navigationTitle("Readiness Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -377,9 +378,11 @@ struct ReadinessDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     @MainActor
@@ -507,7 +510,12 @@ struct NoReadinessDataView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.Colors.pine)
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            .padding(.vertical, AppTheme.Spacing.sm)
+            .background(AppTheme.Colors.strideLime)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -522,9 +530,10 @@ struct ReadinessErrorView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(systemName: "exclamationmark.triangle.fill")
                 .font(.largeTitle)
-                .foregroundColor(.orange)
+                .foregroundColor(AppTheme.Colors.warning)
+                .accessibilityHidden(true)
 
             Text("Unable to calculate readiness")
                 .font(.subheadline)
@@ -545,7 +554,12 @@ struct ReadinessErrorView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.Colors.pine)
+            .padding(.horizontal, AppTheme.Spacing.lg)
+            .padding(.vertical, AppTheme.Spacing.sm)
+            .background(AppTheme.Colors.strideLime)
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.medium))
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -739,17 +753,17 @@ struct ReadinessCalculationSheet: View {
                     HStack {
                         if readinessService.isCalculating {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.pine))
                         } else {
                             Image(systemName: "waveform.path.ecg")
                         }
                         Text(readinessService.isCalculating ? "Calculating..." : "Calculate Now")
                     }
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(12)
                 }
                 .disabled(readinessService.isCalculating)
@@ -758,13 +772,16 @@ struct ReadinessCalculationSheet: View {
                 Spacer()
             }
             .padding(.top, 40)
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                        .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     private func calculateReadiness() async {

@@ -442,15 +442,18 @@ struct WorkoutDetailSheet: View {
                 }
                 .padding()
             }
+            .adaptiveSurfaceTint()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .darkSurfaceTint()
                 }
             }
         }
+        .darkSurfaceTint()
     }
 
     private var formattedDate: String {
@@ -515,7 +518,7 @@ struct TodayRecommendationExplanationView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
             }
-            .tint(AppTheme.Colors.strideBlue)
+            .tint(AppTheme.Colors.infoBlue)
         }
         .accessibilityIdentifier("whyThisWorkoutExplanation")
     }

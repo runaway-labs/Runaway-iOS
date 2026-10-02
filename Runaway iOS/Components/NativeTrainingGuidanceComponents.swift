@@ -42,7 +42,7 @@ struct TodayWeatherChip: View {
             Button(action: refresh) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.Colors.strideBlueLight.opacity(0.75))
+                    .foregroundColor(AppTheme.Colors.infoBlueLight.opacity(0.75))
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
@@ -54,7 +54,7 @@ struct TodayWeatherChip: View {
         .background(
             LinearGradient(
                 colors: [
-                    AppTheme.Colors.strideBlue.opacity(0.16),
+                    AppTheme.Colors.infoBlue.opacity(0.16),
                     AppTheme.Colors.success.opacity(0.08)
                 ],
                 startPoint: .leading,
@@ -63,7 +63,7 @@ struct TodayWeatherChip: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(AppTheme.Colors.strideBlue.opacity(0.22), lineWidth: 1)
+                .stroke(AppTheme.Colors.infoBlue.opacity(0.22), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .task { await requestAndLoadWeather() }
@@ -90,7 +90,7 @@ struct TodayWeatherChip: View {
         case .waitingForLocation, .loading:
             ProgressView()
                 .controlSize(.small)
-                .tint(AppTheme.Colors.strideBlueLight)
+                .tint(AppTheme.Colors.infoBlueLight)
         case .locationRequired:
             Image(systemName: "location.slash.fill")
                 .foregroundColor(.yellow)
@@ -100,7 +100,7 @@ struct TodayWeatherChip: View {
         case let .available(weather):
             Image(systemName: weather.symbolName)
                 .font(.system(size: 18, weight: .medium))
-                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                .foregroundColor(AppTheme.Colors.infoBlueLight)
         }
     }
 
@@ -186,7 +186,7 @@ private struct TodayWeatherDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AppTheme.Colors.strideBlueLight)
+                        .foregroundColor(AppTheme.Colors.infoBlueLight)
                 }
             }
         }
@@ -196,9 +196,9 @@ private struct TodayWeatherDetailView: View {
         HStack(alignment: .top, spacing: 18) {
             Image(systemName: weather.symbolName)
                 .font(.system(size: 38, weight: .medium))
-                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                .foregroundColor(AppTheme.Colors.infoBlueLight)
                 .frame(width: 54, height: 54)
-                .background(AppTheme.Colors.strideBlue.opacity(0.16), in: RoundedRectangle(cornerRadius: 16))
+                .background(AppTheme.Colors.infoBlue.opacity(0.16), in: RoundedRectangle(cornerRadius: 16))
 
             VStack(alignment: .leading, spacing: 5) {
                 if !locationName.isEmpty {
@@ -240,7 +240,7 @@ private struct TodayWeatherDetailView: View {
                                     .foregroundColor(AppTheme.Colors.DarkMode.textSecondary)
                                 Image(systemName: hour.symbolName)
                                     .font(.system(size: 17, weight: .medium))
-                                    .foregroundColor(AppTheme.Colors.strideBlueLight)
+                                    .foregroundColor(AppTheme.Colors.infoBlueLight)
                                 Text("\(displayTemperature(hour.temperatureCelsius))°")
                                     .font(.system(size: 14, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
@@ -250,7 +250,7 @@ private struct TodayWeatherDetailView: View {
                                     systemImage: "drop.fill"
                                 )
                                 .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                                .foregroundColor(AppTheme.Colors.infoBlueLight)
                             }
                             .frame(width: 66)
                             .padding(.vertical, 11)
@@ -300,7 +300,7 @@ private struct TodayWeatherDetailView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: item.symbolName)
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(AppTheme.Colors.strideBlueLight)
+                            .foregroundColor(AppTheme.Colors.infoBlueLight)
                             .frame(width: 28, height: 28)
 
                         VStack(alignment: .leading, spacing: 3) {
@@ -329,7 +329,7 @@ private struct TodayWeatherDetailView: View {
     private func sectionHeader(_ title: String, symbol: String) -> some View {
         Label(title, systemImage: symbol)
             .font(.system(size: 12, weight: .bold, design: .rounded))
-            .foregroundColor(AppTheme.Colors.strideBlueLight)
+            .foregroundColor(AppTheme.Colors.infoBlueLight)
             .textCase(.uppercase)
     }
 
@@ -337,7 +337,7 @@ private struct TodayWeatherDetailView: View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppTheme.Colors.strideBlueLight)
+                .foregroundColor(AppTheme.Colors.infoBlueLight)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
@@ -453,7 +453,7 @@ struct NativeTrainingSummaryStrip: View {
                     conditionsRow
                 }
             }
-            .background((weatherGuidance?.requiresPlanReview == true ? Color.yellow : AppTheme.Colors.strideBlue).opacity(0.08))
+            .background((weatherGuidance?.requiresPlanReview == true ? Color.yellow : AppTheme.Colors.infoBlue).opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.CornerRadius.small + 4))
         }
     }
@@ -465,9 +465,9 @@ struct NativeTrainingSummaryStrip: View {
             case .hidden:
                 return ("", .clear, "")
             case .waitingForLocation:
-                return ("location", AppTheme.Colors.strideBlueLight, "Getting your location...")
+                return ("location", AppTheme.Colors.infoBlueLight, "Getting your location...")
             case .loading:
-                return ("cloud.sun", AppTheme.Colors.strideBlueLight, "Loading local forecast...")
+                return ("cloud.sun", AppTheme.Colors.infoBlueLight, "Loading local forecast...")
             case .locationRequired:
                 return ("location.slash", .yellow, "Allow location in Settings")
             case .unavailable:
@@ -499,7 +499,7 @@ struct NativeTrainingSummaryStrip: View {
 
     private func conditionTint(for guidance: WeatherTrainingGuidance) -> Color {
         switch guidance.level {
-        case .favorable: return AppTheme.Colors.strideBlueLight
+        case .favorable: return AppTheme.Colors.infoBlueLight
         case .caution: return .yellow
         case .high: return .orange
         }

@@ -2,11 +2,12 @@ import SwiftUI
 import WidgetKit
 
 enum ProgressWidgetPalette {
-    static let ink = Color(red: 0.035, green: 0.065, blue: 0.10)
-    static let amber = Color(red: 1, green: 0.72, blue: 0.29)
-    static let blue = Color(red: 0.32, green: 0.68, blue: 1)
+    static let ink = RunawayPalette.nightPine
+    static let amber = RunawayPalette.amber
+    static let lime = RunawayPalette.strideLime
+    static let blue = RunawayPalette.infoBlue
     static let mint = Color(red: 0.32, green: 0.84, blue: 0.66)
-    static let secondary = Color.white.opacity(0.62)
+    static let secondary = RunawayPalette.textSecondary
 
     static func activity(_ kind: ProgressActivityKind) -> Color {
         switch kind {
@@ -46,7 +47,8 @@ struct AccomplishmentWidgetView: View {
             Spacer(minLength: 6)
             if size == .small {
                 Image(systemName: "figure.run").font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ProgressWidgetPalette.amber.opacity(0.7))
+                    .foregroundStyle(ProgressWidgetPalette.secondary)
+                    .widgetAccentable()
             } else {
                 Text(String(progress.year))
                     .font(.system(size: 9, weight: .bold, design: .rounded)).tracking(1)
@@ -146,7 +148,7 @@ struct AccomplishmentWidgetView: View {
             Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
             prescriptionStrip(compact: false)
             HStack(spacing: 16) {
-                GoalProgressRing(title: "WEEK", value: progress.goalWeeklyDistance, goal: progress.weeklyGoal, unit: progress.goalUnit, available: progress.hasWeeklyData, color: ProgressWidgetPalette.amber)
+                GoalProgressRing(title: "WEEK", value: progress.goalWeeklyDistance, goal: progress.weeklyGoal, unit: progress.goalUnit, available: progress.hasWeeklyData, color: ProgressWidgetPalette.lime)
                 GoalProgressRing(title: "MONTH", value: progress.goalMonthlyDistance, goal: progress.monthlyGoal, unit: progress.goalUnit, available: progress.hasMonthlyData, color: ProgressWidgetPalette.mint)
             }
         }
@@ -201,7 +203,7 @@ private struct EarnedProgressTrack: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.1))
-                Capsule().fill(ProgressWidgetPalette.amber)
+                Capsule().fill(ProgressWidgetPalette.lime)
                     .frame(width: geometry.size.width * min(max(value / max(goal, 0.001), 0), 1))
                     .widgetAccentable()
             }

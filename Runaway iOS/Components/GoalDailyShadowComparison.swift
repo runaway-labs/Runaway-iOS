@@ -13,7 +13,7 @@ struct GoalDailyShadowComparisonEntry: View {
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.bordered)
-        .tint(AppTheme.Colors.strideBlue)
+        .tint(AppTheme.Colors.infoBlue)
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.regularMaterial)
@@ -85,7 +85,7 @@ private struct GoalDailyShadowComparisonView: View {
                                     : current.recommendation.workoutType?.isStrength == true
                                 Label(agrees ? "Same discipline as Next Up" : "Different discipline from Next Up",
                                       systemImage: agrees ? "equal.circle" : "arrow.left.arrow.right")
-                                    .foregroundStyle(AppTheme.Colors.strideBlue)
+                                    .foregroundStyle(AppTheme.Colors.infoBlue)
                             }
                         } else {
                             Text("Both fit. Your preference breaks the tie.").font(.headline)

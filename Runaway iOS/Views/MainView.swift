@@ -58,6 +58,8 @@ struct MainView: View {
 
     var body: some View {
         if isDataReady {
+            // Each stack is lime so night-pine bar chrome, back chevrons, and toolbar items stay lime.
+            // Light or adaptive content sets its own adaptive tint inside the stack.
             TabView(selection: $selectedTab) {
                 Tab(RunawayTab.today.title, systemImage: RunawayTab.today.systemImage, value: RunawayTab.today) {
                     NavigationStack(path: Bindable(router).path) {
@@ -68,6 +70,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.plan.title, systemImage: RunawayTab.plan.systemImage, value: RunawayTab.plan) {
@@ -77,6 +80,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.activities.title, systemImage: RunawayTab.activities.systemImage, value: RunawayTab.activities) {
@@ -86,6 +90,7 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .darkSurfaceTint()
                 }
 
                 Tab(RunawayTab.you.title, systemImage: RunawayTab.you.systemImage, value: RunawayTab.you) {
@@ -95,9 +100,11 @@ struct MainView: View {
                                 router.destination(for: route)
                             }
                     }
+                    .darkSurfaceTint()
                 }
             }
-            .tint(AppTheme.Colors.warmAmber)
+            // Tab chrome is always night pine; light content opts into its own adaptive tint.
+            .darkSurfaceTint()
             .ignoresSafeArea(.keyboard)
             .animation(.easeInOut(duration: 0.2), value: selectedTab)
             .onChange(of: selectedTab) { oldTab, newTab in
@@ -193,8 +200,9 @@ struct MainView: View {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button(action: { router.navigate(to: .settings) }) {
                                 Image(systemName: "gearshape.fill")
-                                    .foregroundColor(AppTheme.Colors.accent)
+                                    .foregroundColor(AppTheme.Colors.DarkMode.accent)
                             }
+                            .darkSurfaceTint()
                         }
                     }
             } else if dataManager.isLoadingAthlete {
@@ -208,14 +216,16 @@ struct MainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(backgroundColor)
+                .adaptiveSurfaceTint()
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { router.navigate(to: .settings) }) {
                             Image(systemName: "gearshape.fill")
-                                .foregroundColor(AppTheme.Colors.accent)
+                                .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
+                        .darkSurfaceTint()
                     }
                 }
             } else {
@@ -226,14 +236,16 @@ struct MainView: View {
                         }
                     }
                 })
+                .adaptiveSurfaceTint()
                 .navigationTitle("You")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { router.navigate(to: .settings) }) {
                             Image(systemName: "gearshape.fill")
-                                .foregroundColor(AppTheme.Colors.accent)
+                                .foregroundColor(AppTheme.Colors.DarkMode.accent)
                         }
+                        .darkSurfaceTint()
                     }
                 }
             }
@@ -318,16 +330,16 @@ private struct ProfileLoadingErrorView: View {
                 }) {
                     HStack(spacing: AppTheme.Spacing.sm) {
                         if isRetrying {
-                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: AppTheme.Colors.pine))
                         } else {
                             Image(systemName: "arrow.clockwise")
                         }
                         Text(isRetrying ? "Loading..." : "Try Again")
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.Colors.pine)
                     .padding(.horizontal, AppTheme.Spacing.xl)
                     .padding(.vertical, AppTheme.Spacing.md)
-                    .background(AppTheme.Colors.accent)
+                    .background(AppTheme.Colors.strideLime)
                     .cornerRadius(AppTheme.CornerRadius.medium)
                 }
                 .disabled(isRetrying)

@@ -23,7 +23,7 @@ struct BecomingLine: View {
                     Text("THE BECOMING LINE")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .tracking(1.5)
-                        .foregroundStyle(AppTheme.Colors.strideBlue)
+                        .foregroundStyle(AppTheme.Colors.infoBlue)
                     Text(snapshot.headline)
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
@@ -35,9 +35,9 @@ struct BecomingLine: View {
                 Spacer(minLength: 8)
                 Image(systemName: "point.forward.to.point.capsulepath")
                     .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(AppTheme.Colors.strideBlue)
+                    .foregroundStyle(AppTheme.Colors.infoBlue)
                     .padding(9)
-                    .background(AppTheme.Colors.strideBlue.opacity(0.12), in: Circle())
+                    .background(AppTheme.Colors.infoBlue.opacity(0.12), in: Circle())
             }
 
             HStack(spacing: 0) {
@@ -76,7 +76,7 @@ struct BecomingLine: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        AppTheme.Colors.strideBlue.opacity(0.8),
+                                        AppTheme.Colors.infoBlue.opacity(0.8),
                                         AppTheme.Colors.recoveryMint.opacity(0.5)
                                     ],
                                     startPoint: .leading,
@@ -106,7 +106,7 @@ struct BecomingLine: View {
                     .foregroundStyle(AppTheme.Colors.DarkMode.textSecondary)
                 Text(selectedPath.weekEffect)
                     .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(AppTheme.Colors.strideBlue)
+                    .foregroundStyle(AppTheme.Colors.infoBlue)
             }
             .id(selectedPath.id)
             .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -142,7 +142,7 @@ struct BecomingLine: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            AppTheme.Colors.strideBlue.opacity(0.09),
+                            AppTheme.Colors.infoBlue.opacity(0.09),
                             AppTheme.Colors.recoveryMint.opacity(0.045),
                             Color.clear
                         ],
@@ -153,7 +153,7 @@ struct BecomingLine: View {
         }
         .overlay {
             RoundedRectangle(cornerRadius: 18)
-                .stroke(AppTheme.Colors.strideBlue.opacity(0.18), lineWidth: 1)
+                .stroke(AppTheme.Colors.infoBlue.opacity(0.18), lineWidth: 1)
         }
         .onChange(of: snapshot.recommendedChoice) { _, newValue in
             selectedChoice = newValue
@@ -162,7 +162,7 @@ struct BecomingLine: View {
 
     private func nodeColor(for path: BecomingPath) -> Color {
         if path.isRecommended { return AppTheme.Colors.recoveryMint }
-        if path.choice == .recover { return AppTheme.Colors.strideBlue }
+        if path.choice == .recover { return AppTheme.Colors.infoBlue }
         return AppTheme.Colors.DarkMode.textTertiary
     }
 

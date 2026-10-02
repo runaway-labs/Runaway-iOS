@@ -122,19 +122,37 @@ private struct PerformanceCoachDecisionRouteView: View {
                 systemImage: "figure.run.circle",
                 description: Text("Open Today after your training plan is ready.")
             )
+            .adaptiveSurfaceTint()
             .navigationTitle("Performance Coach")
+            .darkSurfaceTint()
         }
     }
 }
 
 private struct CoachActivityRouteView: View {
     @Environment(UserSession.self) private var session
-    var body: some View { if let id = session.userId { CoachActivityView(athleteID: id) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
+    var body: some View {
+        if let id = session.userId {
+            CoachActivityView(athleteID: id)
+        } else {
+            ContentUnavailableView("Sign in required", systemImage: "lock")
+                .adaptiveSurfaceTint()
+                .darkSurfaceTint()
+        }
+    }
 }
 private struct CoachDecisionRouteView: View {
     @Environment(UserSession.self) private var session
     let decisionID: UUID
-    var body: some View { if let id = session.userId { CoachDecisionDetailView(athleteID: id, decisionID: decisionID) } else { ContentUnavailableView("Sign in required", systemImage: "lock") } }
+    var body: some View {
+        if let id = session.userId {
+            CoachDecisionDetailView(athleteID: id, decisionID: decisionID)
+        } else {
+            ContentUnavailableView("Sign in required", systemImage: "lock")
+                .adaptiveSurfaceTint()
+                .darkSurfaceTint()
+        }
+    }
 }
 
 private struct RoutedActivityDetailView: View {
@@ -161,13 +179,17 @@ private struct RoutedActivityDetailView: View {
             )
         } else if isLoading {
             ProgressView("Loading activity...")
+                .adaptiveSurfaceTint()
+                .darkSurfaceTint()
         } else {
             ContentUnavailableView(
                 "Activity unavailable",
                 systemImage: "figure.run.circle",
                 description: Text("This activity may have been removed, or your connection is unavailable.")
             )
+            .adaptiveSurfaceTint()
             .navigationTitle("Activity")
+            .darkSurfaceTint()
         }
         }
         .task(id: activityId) { await loadActivity() }
