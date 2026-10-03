@@ -94,9 +94,9 @@ final class TrainingProgressStore: ObservableObject {
         while true {
             try Task.checkCancellation()
             let rows: [TrainingProgressRemoteActivity] = try await supabase.from("activities")
-                .select("id,athlete_id,name,activity_types(name),start_time,activity_date,distance,elapsed_time,flagged,map_summary_polyline")
+                .select("id,athlete_id,name,activity_types(name),start_time,activity_date,distance,elapsed_time,flagged,map_summary_polyline,source")
                 .eq("athlete_id", value: athleteID)
-                .or("and(start_time.gte.\(lower),start_time.lte.\(upper)),and(start_time.is.null,activity_date.gte.\(lower),activity_date.lte.\(upper))")
+                .or("and(activity_date.gte.\(lower),activity_date.lte.\(upper)),and(activity_date.is.null,start_time.gte.\(lower),start_time.lte.\(upper))")
                 .order("id", ascending: true)
                 .range(from: offset, to: offset + 499)
                 .execute().value
@@ -105,28 +105,6 @@ final class TrainingProgressStore: ObservableObject {
             offset += 500
         }
         return result
-    }
-}
-
-struct TrainingProgressRemoteActivity: Decodable {
-    struct ActivityType: Decodable { let name: String }
-    let id: Int
-    let athlete_id: Int
-    let name: String?
-    let activity_types: ActivityType?
-    let start_time: Date?
-    let activity_date: Date?
-    let distance: Double?
-    let elapsed_time: Double?
-    let flagged: Bool?
-    let map_summary_polyline: String?
-
-    var activity: TrainingProgressActivity? {
-        guard flagged != true, let date = start_time ?? activity_date else { return nil }
-        return TrainingProgressActivity(id: id, athleteID: athlete_id, name: name ?? "Activity",
-            type: activity_types?.name ?? "Other", date: date,
-            meters: TrainingProgressPolicy.clean(distance ?? 0), seconds: TrainingProgressPolicy.clean(elapsed_time ?? 0),
-            polyline: map_summary_polyline ?? "")
     }
 }
 
@@ -140,9 +118,9 @@ extension TrainingProgressActivity {
         guard activity.flagged != true,
               let timestamp = activity.activity_date ?? activity.start_date else { return nil }
         self.init(id: activity.id, athleteID: activity.athlete_id ?? athleteID,
-                  name: activity.name ?? "Activity", type: activity.type ?? "Other",
+                  name: activity.name ?? "Activity", type: activity.type ?? "",
                   date: Date(timeIntervalSince1970: timestamp),
                   meters: TrainingProgressPolicy.clean(activity.distance ?? 0),
-                  seconds: TrainingProgressPolicy.clean(activity.elapsed_time ?? 0), polyline: activity.summary_polyline ?? "")
+                  seconds: TrainingProgressPolicy.clean(activity.elapsed_time ?? 0), polyline: activity.summary_polyline ?? "", source: activity.source)
     }
 }

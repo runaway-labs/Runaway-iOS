@@ -14,11 +14,40 @@ enum TrainingProgressPolicy {
 
     static func unique(_ activities: [TrainingProgressActivity], athleteID: Int, through now: Date) -> [TrainingProgressActivity] {
         var seen = Set<Int>()
-        return activities.filter {
+        let eligible = activities.filter {
             $0.athleteID == athleteID && $0.date <= now
                 && (clean($0.seconds) > 0 || clean($0.meters) > 0)
                 && seen.insert($0.id).inserted
         }
+        // Reconcile only a unique Garmin/Strava pair. Preserve raw source rows
+        // and uncertain matches; never infer identity from a title or day alone.
+        var mirrored = Set<Int>()
+        for garmin in eligible where provider(garmin) == "garmin" {
+            let matches = eligible.filter { isMirror(garmin, $0) }
+            guard matches.count == 1, let strava = matches.first,
+                  eligible.filter({ isMirror($0, strava) }).count == 1 else { continue }
+            // Keep Garmin when it has a sport; otherwise retain the typed copy
+            // so an unclassified import cannot erase running goal credit.
+            mirrored.insert(garmin.type.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? garmin.id : strava.id)
+        }
+        return eligible.filter { !mirrored.contains($0.id) }
+    }
+
+    private static func provider(_ activity: TrainingProgressActivity) -> String {
+        activity.source?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+    }
+
+    private static func isMirror(_ garmin: TrainingProgressActivity, _ strava: TrainingProgressActivity) -> Bool {
+        guard provider(garmin) == "garmin", provider(strava) == "strava",
+              garmin.athleteID == strava.athleteID,
+              abs(garmin.date.timeIntervalSince(strava.date)) <= 120,
+              garmin.seconds.isFinite, strava.seconds.isFinite,
+              garmin.seconds > 0, strava.seconds > 0,
+              garmin.meters.isFinite, strava.meters.isFinite else { return false }
+        let missingGarminType = garmin.type.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard garmin.kind == strava.kind || (missingGarminType && strava.kind != .other) else { return false }
+        return abs(garmin.seconds - strava.seconds) <= max(60, max(garmin.seconds, strava.seconds) * 0.05)
+            && abs(clean(garmin.meters) - clean(strava.meters)) <= max(100, max(clean(garmin.meters), clean(strava.meters)) * 0.05)
     }
 
     static func totals(_ activities: [TrainingProgressActivity], calendar: Calendar = .current) -> TrainingProgressSnapshot.Totals {
