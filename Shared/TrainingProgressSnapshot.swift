@@ -167,11 +167,38 @@ struct TrainingProgressActivity: Codable, Equatable, Identifiable, Sendable {
     let meters: Double
     let seconds: Double
     let polyline: String
+    var source: String? = nil
     var kind: ProgressActivityKind { ProgressActivityKind(type) }
 }
 
+/// Narrow API projection. activity_date is the canonical imported timestamp;
+/// some providers store a local wall clock in start_time without its offset.
+struct TrainingProgressRemoteActivity: Decodable {
+    struct ActivityType: Decodable { let name: String }
+    let id: Int
+    let athlete_id: Int
+    let name: String?
+    let activity_types: ActivityType?
+    let start_time: Date?
+    let activity_date: Date?
+    let distance: Double?
+    let elapsed_time: Double?
+    let flagged: Bool?
+    let map_summary_polyline: String?
+    let source: String?
+
+    var activity: TrainingProgressActivity? {
+        guard flagged != true, let date = activity_date ?? start_time else { return nil }
+        return TrainingProgressActivity(id: id, athleteID: athlete_id, name: name ?? "Activity",
+            type: activity_types?.name ?? "", date: date,
+            meters: TrainingProgressPolicy.clean(distance ?? 0), seconds: TrainingProgressPolicy.clean(elapsed_time ?? 0),
+            polyline: map_summary_polyline ?? "", source: source)
+    }
+}
+
 struct TrainingProgressSnapshot: Codable, Equatable, Sendable {
-    static let cacheKey = "training_progress_snapshot_v1"
+    // v1 aggregates may contain provider mirrors; require a fresh projection.
+    static let cacheKey = "training_progress_snapshot_v2"
     static let athleteKey = "training_progress_athlete_id"
     static let metersPerMile = 1609.344
 
